@@ -3,6 +3,7 @@ import type { LocalRow } from "@academic-os/core";
 import { AuthGate } from "./components/AuthGate";
 import { TreeSidebar } from "./components/TreeSidebar";
 import { PageEditor } from "./components/PageEditor";
+import { AttachmentsRail } from "./components/AttachmentsRail";
 import { SqliteLocalDb } from "./lib/sqlite-local-db";
 import { createSyncController } from "./lib/sync-loop";
 import "./App.css";
@@ -47,8 +48,15 @@ function MainLayout({ userId }: { userId: string }) {
         onChanged={triggerSync}
       />
       <main className="app-main">
-        {selected && selected["kind"] === "page" ? (
-          <PageEditor localDb={localDb} userId={userId} node={selected} onSaved={triggerSync} />
+        {selected ? (
+          <>
+            {selected["kind"] === "page" ? (
+              <PageEditor localDb={localDb} userId={userId} node={selected} onSaved={triggerSync} />
+            ) : (
+              <h2 className="page-editor__title">{selected["title"] as string}</h2>
+            )}
+            <AttachmentsRail localDb={localDb} userId={userId} node={selected} onChanged={triggerSync} />
+          </>
         ) : (
           <div className="app-main__empty">Select a page, or create one from the sidebar.</div>
         )}

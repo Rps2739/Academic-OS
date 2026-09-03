@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import type { LocalRow } from "@academic-os/core";
 import type { SqliteLocalDb } from "../lib/sqlite-local-db";
+import { SearchBox } from "./SearchBox";
 
 interface TreeSidebarProps {
   localDb: SqliteLocalDb;
@@ -178,6 +179,7 @@ export function TreeSidebar({ localDb, userId, selectedId, onSelect, onChanged }
 
   return (
     <div className="tree-sidebar">
+      <SearchBox localDb={localDb} onSelect={onSelect} />
       <div className="tree-sidebar__toolbar">
         <button onClick={() => void createNode(null, "folder")}>+ Folder</button>
         <button onClick={() => void createNode(null, "page")}>+ Page</button>

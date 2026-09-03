@@ -51,6 +51,60 @@ body {
   padding: 0.5rem;
 }
 
+.search-box {
+  position: relative;
+  margin-bottom: 0.5rem;
+}
+
+.search-box__input {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 0.3rem 0.5rem;
+}
+
+.search-box__results {
+  position: absolute;
+  z-index: 10;
+  top: 100%;
+  left: 0;
+  right: 0;
+  margin: 0.2rem 0 0;
+  padding: 0.25rem;
+  list-style: none;
+  background: Canvas;
+  border: 1px solid #3333;
+  border-radius: 6px;
+  max-height: 60vh;
+  overflow-y: auto;
+  box-shadow: 0 4px 12px #0004;
+}
+
+.search-box__empty {
+  padding: 0.4rem;
+  color: #888;
+  font-size: 0.85rem;
+}
+
+.search-box__result {
+  padding: 0.35rem 0.4rem;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.search-box__result:hover {
+  background: #4a90e233;
+}
+
+.search-box__result-title {
+  font-size: 0.9rem;
+}
+
+.search-box__result-snippet {
+  font-size: 0.78rem;
+  color: #888;
+  margin-top: 0.1rem;
+}
+
 .tree-sidebar__toolbar {
   display: flex;
   gap: 0.4rem;
@@ -129,4 +183,68 @@ body {
 
 .page-editor__title {
   margin-top: 0;
+}
+
+.attachments-rail {
+  margin-top: 1.5rem;
+  padding-top: 1rem;
+  border-top: 1px solid #3333;
+}
+
+.attachments-rail__header {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.attachments-rail__title {
+  margin: 0;
+  flex: 1;
+  font-size: 0.9rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: #888;
+}
+
+.attachments-rail__error {
+  color: #d33;
+}
+
+.attachments-rail__empty {
+  color: #888;
+  font-size: 0.85rem;
+}
+
+.attachments-rail__list {
+  list-style: none;
+  margin: 0.5rem 0 0;
+  padding: 0;
+}
+
+.attachments-rail__item {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.25rem 0;
+}
+
+.attachments-rail__filename {
+  flex: 1;
+  text-align: left;
+  border: none;
+  background: none;
+  cursor: pointer;
+  color: #4a90e2;
+  padding: 0;
+}
+
+.attachments-rail__delete {
+  border: none;
+  background: none;
+  cursor: pointer;
+  opacity: 0.5;
+}
+
+.attachments-rail__delete:hover {
+  opacity: 1;
 }
