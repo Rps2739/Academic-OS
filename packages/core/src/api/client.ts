@@ -11,6 +11,12 @@ export function createSupabaseClient(url: string, anonKey: string): SupabaseClie
     auth: {
       persistSession: true,
       autoRefreshToken: true,
+      // PKCE returns the OAuth result as `?code=` on the redirect URL.
+      // The desktop app's loopback callback server (src-tauri/src/lib.rs)
+      // is a plain HTTP server reading the request's query string — it
+      // would never see an implicit-flow `#access_token=` hash fragment,
+      // since fragments never leave the browser.
+      flowType: "pkce",
     },
   });
 }

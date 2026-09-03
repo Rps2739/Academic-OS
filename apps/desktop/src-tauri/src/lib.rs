@@ -1,9 +1,59 @@
+use std::io::{Read, Write};
+use std::net::TcpListener;
 use tauri::{Emitter, Manager};
-use tauri_plugin_deep_link::DeepLinkExt;
 use tauri_plugin_sql::{Migration, MigrationKind};
 
 const DB_URL: &str = "sqlite:academic-os.db";
-const OAUTH_SCHEME: &str = "academicos://";
+
+/// Fixed port for the OAuth loopback redirect — must match the URL entered
+/// in Supabase's Redirect URLs allow list (http://127.0.0.1:17823/callback).
+/// A custom academicos:// URL scheme was tried first, but Chrome silently
+/// drops external-protocol redirects that arrive via Google's own internal
+/// redirect chain; a plain http:// loopback is the standard, reliable
+/// pattern desktop OAuth clients use instead (same approach as `gcloud`,
+/// the GitHub CLI, etc.).
+const OAUTH_CALLBACK_PORT: u16 = 17823;
+
+/// Starts a one-shot local HTTP server, waits for the single OAuth redirect
+/// request on a background thread, extracts `code` from its query string,
+/// and emits it to the frontend as "oauth-callback". Returns the port so
+/// the frontend can build the exact `redirectTo` URL.
+#[tauri::command]
+fn start_oauth_server(app: tauri::AppHandle) -> Result<u16, String> {
+    let listener =
+        TcpListener::bind(("127.0.0.1", OAUTH_CALLBACK_PORT)).map_err(|e| e.to_string())?;
+
+    std::thread::spawn(move || {
+        let Ok((mut stream, _)) = listener.accept() else {
+            return;
+        };
+        let mut buf = [0u8; 8192];
+        let n = stream.read(&mut buf).unwrap_or(0);
+        let request = String::from_utf8_lossy(&buf[..n]);
+        let code = request
+            .lines()
+            .next()
+            .and_then(|line| line.split_whitespace().nth(1))
+            .and_then(|path| path.split_once("code="))
+            .map(|(_, rest)| rest.split(['&', ' ']).next().unwrap_or("").to_string());
+
+        let body = "<html><body style=\"font-family:sans-serif;text-align:center;margin-top:20vh\">\
+                     <h2>Signed in</h2><p>You can close this tab and return to Academic OS.</p>\
+                     </body></html>";
+        let response = format!(
+            "HTTP/1.1 200 OK\r\nContent-Type: text/html\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{}",
+            body.len(),
+            body
+        );
+        let _ = stream.write_all(response.as_bytes());
+
+        if let Some(code) = code.filter(|c| !c.is_empty()) {
+            let _ = app.emit("oauth-callback", code);
+        }
+    });
+
+    Ok(OAUTH_CALLBACK_PORT)
+}
 
 /// Local mirror schema — must stay in step with
 /// packages/core/src/sync/sqlite-schema.ts (TABLE_COLUMNS/PK_COLUMN). Each
@@ -109,15 +159,11 @@ fn migrations() -> Vec<Migration> {
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
-        // Must be the first plugin registered. On Windows/Linux, completing
-        // the Google OAuth flow in the system browser relaunches the app as
-        // a SECOND process with the academicos:// callback URL as a CLI
-        // arg; this plugin detects that, forwards the URL to the already-
-        // running instance via an event, and exits the second process.
-        .plugin(tauri_plugin_single_instance::init(|app, argv, _cwd| {
-            if let Some(url) = argv.iter().find(|a| a.starts_with(OAUTH_SCHEME)) {
-                let _ = app.emit("oauth-callback", url.clone());
-            }
+        // Must be the first plugin registered. Just focuses the existing
+        // window if a second instance is launched — no OAuth handoff role
+        // now that sign-in uses a loopback HTTP server instead of a custom
+        // URL scheme.
+        .plugin(tauri_plugin_single_instance::init(|app, _argv, _cwd| {
             if let Some(window) = app.get_webview_window("main") {
                 let _ = window.set_focus();
             }
@@ -128,18 +174,7 @@ pub fn run() {
                 .add_migrations(DB_URL, migrations())
                 .build(),
         )
-        .plugin(tauri_plugin_deep_link::init())
-        .setup(|app| {
-            // In dev builds the installer hasn't registered the URL scheme
-            // yet — register it for this run so the OAuth callback works
-            // without a full production build. Release builds register it
-            // automatically at install time.
-            #[cfg(any(target_os = "linux", all(debug_assertions, windows)))]
-            {
-                app.deep_link().register_all()?;
-            }
-            Ok(())
-        })
+        .invoke_handler(tauri::generate_handler![start_oauth_server])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }

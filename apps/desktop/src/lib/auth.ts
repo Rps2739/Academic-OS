@@ -1,23 +1,27 @@
 import { openUrl } from "@tauri-apps/plugin-opener";
-import { onOpenUrl } from "@tauri-apps/plugin-deep-link";
+import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { supabase } from "./supabase";
 
-const REDIRECT_URL = "academicos://auth-callback";
-
 /**
- * Opens Google's consent screen in the SYSTEM browser (never an in-app
- * webview — this is what lets the user's existing Google session and any
- * password manager work normally, and is what Google's own policies expect
- * from a native app). supabase-js defaults to the PKCE flow, so the
- * callback arrives as `academicos://auth-callback?code=...`, exchanged
- * below — never as a hash-fragment access token.
+ * Sign-in opens Google's consent screen in the SYSTEM browser (never an
+ * in-app webview — this lets the user's existing Google session and any
+ * password manager work normally, and is what Google's policies expect
+ * from a native app). The OAuth redirect target is a local loopback HTTP
+ * server (127.0.0.1) rather than a custom academicos:// URL scheme —
+ * Chrome silently drops external-protocol redirects that arrive via
+ * Google's own internal redirect chain, but a plain http:// redirect
+ * always works. This is the same pattern `gcloud`, the GitHub CLI, and
+ * other desktop OAuth clients use. The Rust side (start_oauth_server,
+ * src-tauri/src/lib.rs) binds the fixed port below and emits the
+ * resulting `code` as an "oauth-callback" event once Google redirects.
  */
 export async function signInWithGoogle(): Promise<void> {
+  const port = await invoke<number>("start_oauth_server");
   const { data, error } = await supabase.auth.signInWithOAuth({
     provider: "google",
     options: {
-      redirectTo: REDIRECT_URL,
+      redirectTo: `http://127.0.0.1:${port}/callback`,
       skipBrowserRedirect: true,
     },
   });
@@ -25,36 +29,20 @@ export async function signInWithGoogle(): Promise<void> {
   if (data.url) await openUrl(data.url);
 }
 
-async function completeSignIn(url: string): Promise<void> {
-  const code = new URL(url).searchParams.get("code");
-  if (!code) return;
+async function completeSignIn(code: string): Promise<void> {
   const { error } = await supabase.auth.exchangeCodeForSession(code);
   if (error) console.error("Sign-in failed:", error.message);
 }
 
 /**
- * Wires up both paths a Windows deep-link callback can arrive by:
- *  - onOpenUrl: the plugin's native event (macOS/Linux, and some Windows cases)
- *  - "oauth-callback": emitted by the Rust single-instance handler (src-tauri/src/lib.rs)
- *    when the OS spawns a second process for the academicos:// URL while
- *    this app is already running — the realistic case for this flow, since
- *    the app is the one that opened the browser in the first place.
- * Call once at app startup; call the returned function on teardown.
+ * Listens for the "oauth-callback" event emitted by the Rust loopback
+ * server once Google redirects back with an auth code. Call once at app
+ * startup; call the returned function on teardown.
  */
 export async function initDeepLinkAuthListener(): Promise<() => void> {
-  const unlistenOpenUrl = await onOpenUrl((urls) => {
-    const match = urls.find((u) => u.startsWith(REDIRECT_URL));
-    if (match) void completeSignIn(match);
-  });
-
-  const unlistenEvent = await listen<string>("oauth-callback", (event) => {
+  return listen<string>("oauth-callback", (event) => {
     void completeSignIn(event.payload);
   });
-
-  return () => {
-    unlistenOpenUrl();
-    unlistenEvent();
-  };
 }
 
 export async function signOut(): Promise<void> {
