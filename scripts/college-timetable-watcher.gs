@@ -41,8 +41,18 @@ function checkAndIngestTimetables() {
   var label = getOrCreateLabel_('AcademicOS-Processed');
   // subject:Timetable narrows out the unrelated .xlsx attachments
   // (scoresheets, CV drives, etc.) that a bare has:attachment search
-  // also matched during testing.
-  var threads = GmailApp.search('subject:Timetable has:attachment filename:xlsx -label:AcademicOS-Processed', 0, 20);
+  // also matched during testing. after: a rolling 10-day window keeps
+  // this scoped to "this week and every week from now on" — without it,
+  // the very first run swept up the entire semester's backlog of old
+  // timetable emails in one go and blew through the Gemini free tier's
+  // daily quota. 10 days comfortably covers a timetable sent a few days
+  // early plus any mid-week revision; it never needs updating since it's
+  // computed fresh on every run.
+  var threads = GmailApp.search(
+    'subject:Timetable has:attachment filename:xlsx after:' + searchWindowStart_() + ' -label:AcademicOS-Processed',
+    0,
+    20
+  );
   Logger.log('Found ' + threads.length + ' unprocessed timetable thread(s)');
 
   threads.forEach(function (thread) {
@@ -117,6 +127,12 @@ function ingestOne_(endpoint, secret, message, attachment) {
 
 function getOrCreateLabel_(name) {
   return GmailApp.getUserLabelByName(name) || GmailApp.createLabel(name);
+}
+
+function searchWindowStart_() {
+  var d = new Date();
+  d.setDate(d.getDate() - 10);
+  return Utilities.formatDate(d, Session.getScriptTimeZone(), 'yyyy/MM/dd');
 }
 
 // One-off cleanup: run this once after a run that mislabeled threads
