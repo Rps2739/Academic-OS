@@ -15,6 +15,7 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2.114.0";
 import { getGoogleAccessToken } from "../_shared/google-oauth.ts";
 import { uploadFileToDrive } from "../_shared/drive.ts";
 import { extractTimetableWithGemini, toUtcIso } from "../_shared/gemini.ts";
+import { syncClassSessionsToCalendar } from "../_shared/calendar.ts";
 
 async function sha256Hex(bytes: Uint8Array): Promise<string> {
   const digest = await crypto.subtle.digest("SHA-256", bytes);
@@ -184,6 +185,22 @@ Deno.serve(async (req) => {
         }))
       );
       if (sessionsErr) throw new Error(`Failed to record sessions: ${sessionsErr.message}`);
+
+      // Best-effort, same as the Drive upload — the import itself has
+      // already succeeded and must not be undone by a Calendar hiccup.
+      // This is what makes new sessions show up in Calendar without the
+      // desktop app needing to be open (gcal-sync only runs while it is).
+      try {
+        // Fetched fresh rather than reusing the Drive-upload token above
+        // — that one is scoped to the `if (!driveFileId)` branch and
+        // may not have run this call (a retry reusing an existing
+        // driveFileId skips it entirely). Access tokens are cheap and
+        // short-lived by design, so no reason to thread it through.
+        const calendarAccessToken = await getGoogleAccessToken();
+        await syncClassSessionsToCalendar(supabase, userId, calendarAccessToken);
+      } catch (err) {
+        console.error("Calendar sync failed after ingest:", err);
+      }
     }
 
     return new Response(

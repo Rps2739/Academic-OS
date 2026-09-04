@@ -1,22 +1,23 @@
 #!/usr/bin/env node
 // One-time script: obtains a Google OAuth refresh token, scoped to
-// drive.file + tasks, for the personal account the Edge Functions
-// (drive-upload / drive-fetch / gtasks-sync) act as. Run once, copy the
-// printed refresh_token straight into `supabase secrets set` yourself —
-// this script never writes it to disk and this repo never sees it.
+// drive.file + tasks + calendar, for the personal account the Edge
+// Functions (drive-upload / drive-fetch / gtasks-sync / gcal-sync /
+// timetable-ingest's calendar push) act as. Run once, copy the printed
+// refresh_token straight into `supabase secrets set` yourself — this
+// script never writes it to disk and this repo never sees it.
 //
 // Re-run this (and re-set the secret) any time the scope list changes —
 // a refresh token only carries the scopes it was originally granted
-// with, so adding "tasks" here means an OLD drive-only refresh token
-// stops being enough and needs replacing, not just adding to.
+// with, so adding "calendar" here means an OLD drive+tasks-only refresh
+// token stops being enough and needs replacing, not just adding to.
 //
 // Prerequisites (Google Cloud Console, on the SAME OAuth client already
 // used for Supabase Google sign-in):
-//   1. APIs & Services -> Library -> enable "Google Drive API" and
-//      "Google Tasks API".
+//   1. APIs & Services -> Library -> enable "Google Drive API",
+//      "Google Tasks API", and "Google Calendar API".
 //   2. APIs & Services -> Credentials -> open that OAuth client -> Edit ->
 //      Authorized redirect URIs -> add http://127.0.0.1:53682/callback
-//      (skip if already added from the Drive-only run).
+//      (skip if already added from an earlier run).
 //
 // Usage (PowerShell):
 //   $env:GOOGLE_CLIENT_ID = "..."
@@ -24,7 +25,7 @@
 //   node scripts/get-google-refresh-token.mjs
 //
 // The script opens your browser, you approve access to your OWN personal
-// Drive + Tasks, and it prints a refresh_token once. Store it immediately
+// Drive + Tasks + Calendar, and it prints a refresh_token once. Store it immediately
 // with the command it prints, then close this terminal. Do not paste the
 // token anywhere else.
 
@@ -36,6 +37,7 @@ const REDIRECT_URI = `http://127.0.0.1:${PORT}/callback`;
 const SCOPES = [
   "https://www.googleapis.com/auth/drive.file",
   "https://www.googleapis.com/auth/tasks",
+  "https://www.googleapis.com/auth/calendar",
 ].join(" ");
 
 const clientId = process.env.GOOGLE_CLIENT_ID;

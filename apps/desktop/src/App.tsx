@@ -10,6 +10,7 @@ import { TimetableView } from "./components/TimetableView";
 import { SqliteLocalDb } from "./lib/sqlite-local-db";
 import { createSyncController } from "./lib/sync-loop";
 import { createGTasksSyncController } from "./lib/gtasks-sync-loop";
+import { createGCalSyncController } from "./lib/gcal-sync-loop";
 import { enable as enableAutostart, isEnabled as isAutostartEnabled } from "@tauri-apps/plugin-autostart";
 import "./App.css";
 
@@ -39,6 +40,9 @@ function MainLayout({ userId }: { userId: string }) {
       // for the main sync loop's own next interval.
       const gtasks = createGTasksSyncController(() => controller.triggerSync());
       gtasks.start();
+
+      const gcal = createGCalSyncController(() => controller.triggerSync());
+      gcal.start();
     });
 
     // The app is meant to always be running (it's what keeps the desktop
