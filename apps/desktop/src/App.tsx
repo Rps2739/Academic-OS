@@ -1,18 +1,19 @@
 import { useEffect, useRef, useState } from "react";
 import type { LocalRow } from "@academic-os/core";
-import { FileText, NotebookText, ListTodo } from "lucide-react";
+import { FileText, NotebookText, ListTodo, CalendarDays } from "lucide-react";
 import { AuthGate } from "./components/AuthGate";
 import { TreeSidebar } from "./components/TreeSidebar";
 import { PageEditor } from "./components/PageEditor";
 import { AttachmentsRail } from "./components/AttachmentsRail";
 import { TaskList } from "./components/TaskList";
+import { TimetableUpload } from "./components/TimetableUpload";
 import { SqliteLocalDb } from "./lib/sqlite-local-db";
 import { createSyncController } from "./lib/sync-loop";
 import { createGTasksSyncController } from "./lib/gtasks-sync-loop";
 import { enable as enableAutostart, isEnabled as isAutostartEnabled } from "@tauri-apps/plugin-autostart";
 import "./App.css";
 
-type View = "notes" | "tasks";
+type View = "notes" | "tasks" | "timetable";
 
 function MainLayout({ userId }: { userId: string }) {
   const [localDb, setLocalDb] = useState<SqliteLocalDb | null>(null);
@@ -78,6 +79,13 @@ function MainLayout({ userId }: { userId: string }) {
         >
           <ListTodo size={19} strokeWidth={1.75} />
         </button>
+        <button
+          className={`nav-rail__item ${view === "timetable" ? "nav-rail__item--active" : ""}`}
+          title="Timetable"
+          onClick={() => setView("timetable")}
+        >
+          <CalendarDays size={19} strokeWidth={1.75} />
+        </button>
       </nav>
       {view === "notes" ? (
         <>
@@ -107,9 +115,13 @@ function MainLayout({ userId }: { userId: string }) {
             )}
           </main>
         </>
-      ) : (
+      ) : view === "tasks" ? (
         <main className="app-main app-main--tasks">
           <TaskList localDb={localDb} userId={userId} onChanged={triggerSync} />
+        </main>
+      ) : (
+        <main className="app-main app-main--timetable">
+          <TimetableUpload localDb={localDb} userId={userId} onChanged={triggerSync} />
         </main>
       )}
     </div>

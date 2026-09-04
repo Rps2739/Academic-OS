@@ -43,7 +43,7 @@ export function ClassesWidget() {
     if (!localDb) return;
     const rows = await localDb.raw.select<Record<string, unknown>[]>(
       `SELECT * FROM class_sessions
-       WHERE date(starts_at) = date('now', 'localtime') AND status != 'cancelled' AND deleted_at IS NULL
+       WHERE date(starts_at) = date('now', 'localtime') AND status NOT IN ('cancelled', 'superseded') AND deleted_at IS NULL
        ORDER BY starts_at ASC`
     );
     setSessions(rows as LocalRow[]);

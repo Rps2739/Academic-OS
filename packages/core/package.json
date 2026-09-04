@@ -15,9 +15,11 @@
     "jszip": "^3.10.1",
     "mammoth": "^1.12.2",
     "unpdf": "^1.8.1",
+    "xlsx": "^0.18.5",
     "zod": "^3.24.1"
   },
   "devDependencies": {
+    "@types/node": "^26.4.1",
     "typescript": "^5.7.2",
     "vitest": "^2.1.8"
   }

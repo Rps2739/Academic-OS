@@ -1537,3 +1537,151 @@ body.widget-window {
 .quick-capture__input::placeholder {
   color: var(--muted);
 }
+
+/* ============================================================
+   Timetable upload
+   ============================================================ */
+.app-main--timetable {
+  max-width: 760px;
+  margin: 0 auto;
+  width: 100%;
+}
+
+.timetable-upload__header {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  margin-bottom: var(--space-4);
+}
+
+.timetable-upload__title {
+  margin: 0;
+  flex: 1;
+  font-size: var(--text-2xl);
+  font-weight: 650;
+  letter-spacing: -0.02em;
+}
+
+.timetable-upload__error {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  margin-bottom: var(--space-3);
+  border-radius: var(--radius-md);
+  background: var(--danger-tint);
+  color: var(--danger);
+  font-size: var(--text-sm);
+}
+
+.timetable-upload__empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-8) 0;
+  color: var(--muted-2);
+  font-size: var(--text-sm);
+  text-align: center;
+}
+
+.timetable-upload__summary {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+  margin-bottom: var(--space-3);
+  font-size: var(--text-sm);
+  color: var(--ink-secondary);
+}
+
+.timetable-upload__badge {
+  padding: 2px var(--space-2);
+  border-radius: var(--radius-full);
+  font-size: var(--text-xs);
+}
+
+.timetable-upload__badge--warn {
+  background: oklch(0.78 0.15 85 / 16%);
+  color: var(--warning);
+}
+
+.timetable-upload__warnings {
+  list-style: none;
+  margin: 0 0 var(--space-3);
+  padding: var(--space-2);
+  border-radius: var(--radius-md);
+  background: oklch(0.78 0.15 85 / 10%);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.timetable-upload__warnings li {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-2);
+  color: var(--warning);
+  font-size: var(--text-xs);
+}
+
+.timetable-upload__preview {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  margin-bottom: var(--space-4);
+}
+
+.timetable-upload__day h3 {
+  margin: 0 0 var(--space-2);
+  font-size: var(--text-xs);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--muted);
+}
+
+.timetable-upload__day ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.timetable-upload__day li {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-2);
+  border-bottom: 1px solid var(--border);
+  font-size: var(--text-sm);
+}
+
+.timetable-upload__time {
+  flex-shrink: 0;
+  width: 110px;
+  color: var(--accent-hover);
+  font-size: var(--text-xs);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.timetable-upload__subject {
+  flex: 1;
+  color: var(--ink);
+}
+
+.timetable-upload__faculty {
+  flex-shrink: 0;
+  color: var(--muted);
+  font-size: var(--text-xs);
+}
+
+.timetable-upload__confirmed {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  color: var(--success);
+  font-size: var(--text-sm);
+}
