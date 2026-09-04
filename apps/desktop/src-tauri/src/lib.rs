@@ -156,6 +156,14 @@ fn migrations() -> Vec<Migration> {
             );
             CREATE INDEX page_versions_local_node_idx ON page_versions_local (node_id, created_at DESC);
         ",
+    }, Migration {
+        version: 2,
+        description: "timetable_imports_drive_file",
+        kind: MigrationKind::Up,
+        sql: "
+            ALTER TABLE timetable_imports ADD COLUMN drive_file_id TEXT;
+            ALTER TABLE timetable_imports ADD COLUMN original_filename TEXT;
+        ",
     }]
 }
 

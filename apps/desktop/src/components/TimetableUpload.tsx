@@ -1,6 +1,7 @@
 import { useRef, useState } from "react";
 import { parseTimetableWorkbook, type ParseResult } from "@academic-os/core";
 import type { SqliteLocalDb } from "../lib/sqlite-local-db";
+import { supabase } from "../lib/supabase";
 import { Upload, AlertTriangle, Check, CalendarDays } from "lucide-react";
 
 interface TimetableUploadProps {
@@ -57,10 +58,12 @@ export function TimetableUpload({ localDb, userId, onChanged }: TimetableUploadP
   const [confirmed, setConfirmed] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const fileInput = useRef<HTMLInputElement>(null);
+  const pendingFile = useRef<File | null>(null);
 
   async function handleFile(files: FileList | null) {
     const file = files?.[0];
     if (!file) return;
+    pendingFile.current = file;
     setParsing(true);
     setError(null);
     setResult(null);
@@ -104,6 +107,26 @@ export function TimetableUpload({ localDb, userId, onChanged }: TimetableUploadP
       }
 
       const importId = crypto.randomUUID();
+      const file = pendingFile.current;
+
+      // Best-effort — the import itself must succeed even if Drive is
+      // unreachable. Keeps the original spreadsheet around for the
+      // archive view's "download original" action.
+      let driveFileId: string | null = null;
+      if (file) {
+        try {
+          const form = new FormData();
+          form.append("file", file);
+          form.append("filename", file.name);
+          const { data, error: fnError } = await supabase.functions.invoke("drive-upload", {
+            body: form,
+          });
+          if (!fnError) driveFileId = (data as { driveFileId: string }).driveFileId;
+        } catch {
+          // archive can still show the parsed sessions without the original file
+        }
+      }
+
       await localDb.put("timetable_imports", {
         id: importId,
         user_id: userId,
@@ -116,6 +139,8 @@ export function TimetableUpload({ localDb, userId, onChanged }: TimetableUploadP
         parsed_ok: result.warnings.length === 0,
         parse_error: null,
         superseded_by: null,
+        drive_file_id: driveFileId,
+        original_filename: file?.name ?? null,
       });
 
       for (const s of result.sessions) {

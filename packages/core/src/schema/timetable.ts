@@ -14,6 +14,8 @@ export const timetableImportSchema = syncableBase.extend({
   parsed_ok: z.boolean().default(false),
   parse_error: z.string().nullable(),
   superseded_by: z.string().uuid().nullable(),
+  drive_file_id: z.string().nullable(),
+  original_filename: z.string().nullable(),
 });
 
 export type TimetableImport = z.infer<typeof timetableImportSchema>;

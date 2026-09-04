@@ -6,7 +6,7 @@ import { TreeSidebar } from "./components/TreeSidebar";
 import { PageEditor } from "./components/PageEditor";
 import { AttachmentsRail } from "./components/AttachmentsRail";
 import { TaskList } from "./components/TaskList";
-import { TimetableUpload } from "./components/TimetableUpload";
+import { TimetableView } from "./components/TimetableView";
 import { SqliteLocalDb } from "./lib/sqlite-local-db";
 import { createSyncController } from "./lib/sync-loop";
 import { createGTasksSyncController } from "./lib/gtasks-sync-loop";
@@ -121,7 +121,7 @@ function MainLayout({ userId }: { userId: string }) {
         </main>
       ) : (
         <main className="app-main app-main--timetable">
-          <TimetableUpload localDb={localDb} userId={userId} onChanged={triggerSync} />
+          <TimetableView localDb={localDb} userId={userId} onChanged={triggerSync} />
         </main>
       )}
     </div>

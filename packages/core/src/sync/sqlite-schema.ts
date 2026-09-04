@@ -115,6 +115,8 @@ export const TABLE_COLUMNS: Record<TableName, Record<string, SqliteType>> = {
     parsed_ok: "INTEGER",
     parse_error: "TEXT",
     superseded_by: "TEXT",
+    drive_file_id: "TEXT",
+    original_filename: "TEXT",
   },
   class_sessions: {
     ...universalColumns,
