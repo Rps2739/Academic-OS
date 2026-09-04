@@ -21,9 +21,16 @@ async function sha256Hex(bytes: Uint8Array): Promise<string> {
   return [...new Uint8Array(digest)].map((b) => b.toString(16).padStart(2, "0")).join("");
 }
 
+// One String.fromCharCode call per byte was cheap-looking but expensive
+// enough on a larger .xlsx to trip Supabase's per-invocation CPU limit
+// (WORKER_RESOURCE_LIMIT) in practice — chunking amortizes the call
+// overhead across many bytes at once instead.
 function toBase64(bytes: Uint8Array): string {
+  const CHUNK_SIZE = 0x8000;
   let binary = "";
-  for (const b of bytes) binary += String.fromCharCode(b);
+  for (let i = 0; i < bytes.length; i += CHUNK_SIZE) {
+    binary += String.fromCharCode(...bytes.subarray(i, i + CHUNK_SIZE));
+  }
   return btoa(binary);
 }
 

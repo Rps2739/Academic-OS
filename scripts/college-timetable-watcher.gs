@@ -96,8 +96,23 @@ function ingestOne_(endpoint, secret, message, attachment) {
     muteHttpExceptions: true,
   });
   var code = res.getResponseCode();
-  Logger.log(attachment.getName() + ' -> ' + code + ' ' + res.getContentText());
-  return code >= 200 && code < 300;
+  var text = res.getContentText();
+  Logger.log(attachment.getName() + ' -> ' + code + ' ' + text);
+  if (code < 200 || code >= 300) return false;
+
+  // The Edge Function deliberately still responds 200 when extraction
+  // itself failed (e.g. a Gemini rate limit) — it records the attempt
+  // rather than losing the file. Only "duplicate" or a clean "ok" with
+  // no parseError counts as actually done; anything else should stay
+  // unlabeled so the next hourly run retries it (cheap — the function
+  // reuses the Drive upload and just re-calls Gemini for a checksum it
+  // already has on file).
+  try {
+    var body = JSON.parse(text);
+    return body.status === 'duplicate' || (body.status === 'ok' && !body.parseError);
+  } catch (err) {
+    return false;
+  }
 }
 
 function getOrCreateLabel_(name) {
