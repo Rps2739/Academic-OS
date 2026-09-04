@@ -53,6 +53,16 @@ function checkAndIngestTimetables() {
         var ok = false;
         try {
           ok = ingestOne_(endpoint, secret, message, attachment);
+          // A big backlog run (many unprocessed threads at once, e.g.
+          // the first-ever run) fires one Gemini extraction per
+          // attachment in a tight loop, which is exactly what tripped a
+          // 503 "high demand" response against a fresh API key's
+          // per-minute quota in practice. The Edge Function itself
+          // already retries a single request with backoff; this spaces
+          // the requests out so a big backlog doesn't cause that in the
+          // first place. Ordinary hourly runs only see 0-1 new threads,
+          // so this adds no real delay in steady state.
+          Utilities.sleep(4000);
         } catch (err) {
           Logger.log('Ingest failed for ' + attachment.getName() + ': ' + err);
         }

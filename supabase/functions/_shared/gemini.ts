@@ -71,35 +71,53 @@ Rules:
 - A single wide merged cell spanning multiple time slots is one session with the full merged time range — do not split it into multiple sessions.
 - Skip empty/unscheduled cells.`;
 
+const MAX_ATTEMPTS = 4;
+
+// 429 (rate limit) and 503 (transient overload — "high demand, try again
+// later") are both worth a retry with backoff; a burst of ~20 requests
+// in one watcher run against a fresh API key's low per-minute quota hit
+// this in practice on the first real run. Anything else (bad request,
+// auth, retired model) won't be fixed by waiting, so fail immediately.
+async function requestWithRetry(base64Data: string, mimeType: string, apiKey: string) {
+  let lastErrorText = "";
+  for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+    const res = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/${MODEL}:generateContent?key=${apiKey}`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          contents: [
+            {
+              parts: [{ text: PROMPT }, { inline_data: { mime_type: mimeType, data: base64Data } }],
+            },
+          ],
+          generationConfig: {
+            responseMimeType: "application/json",
+            responseSchema: RESPONSE_SCHEMA,
+          },
+        }),
+      }
+    );
+
+    if (res.ok) return res.json();
+
+    lastErrorText = await res.text();
+    if ((res.status === 429 || res.status === 503) && attempt < MAX_ATTEMPTS) {
+      await new Promise((resolve) => setTimeout(resolve, 2 ** attempt * 1000));
+      continue;
+    }
+    throw new Error(`Gemini extraction request failed: ${lastErrorText}`);
+  }
+  throw new Error(`Gemini extraction request failed after ${MAX_ATTEMPTS} attempts: ${lastErrorText}`);
+}
+
 export async function extractTimetableWithGemini(
   base64Data: string,
   mimeType: string,
   apiKey: string
 ): Promise<ExtractionResult> {
-  const res = await fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/${MODEL}:generateContent?key=${apiKey}`,
-    {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        contents: [
-          {
-            parts: [{ text: PROMPT }, { inline_data: { mime_type: mimeType, data: base64Data } }],
-          },
-        ],
-        generationConfig: {
-          responseMimeType: "application/json",
-          responseSchema: RESPONSE_SCHEMA,
-        },
-      }),
-    }
-  );
-
-  if (!res.ok) {
-    throw new Error(`Gemini extraction request failed: ${await res.text()}`);
-  }
-
-  const data = await res.json();
+  const data = await requestWithRetry(base64Data, mimeType, apiKey);
   const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
   if (typeof text !== "string") {
     throw new Error(`Gemini returned no extractable content: ${JSON.stringify(data)}`);
