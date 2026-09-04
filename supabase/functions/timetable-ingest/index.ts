@@ -73,24 +73,32 @@ Deno.serve(async (req) => {
     const checksum = await sha256Hex(bytes);
 
     // Idempotency: the watcher may see the same email again (retry, or a
-    // re-run before its processed-label sticks) — a prior import with
-    // this exact checksum means there's nothing new to do.
+    // re-run before its processed-label sticks). A prior import with
+    // this exact checksum that already parsed successfully means there's
+    // nothing new to do — but one that previously *failed* to parse
+    // (a bad Gemini response, a since-fixed bug) should be retried, not
+    // treated as done forever just because the file itself is unchanged.
     const { data: existing } = await supabase
       .from("timetable_imports")
-      .select("id")
+      .select("id, parsed_ok, drive_file_id")
       .eq("user_id", userId)
       .eq("checksum", checksum)
       .is("deleted_at", null)
       .maybeSingle();
-    if (existing) {
+    if (existing?.parsed_ok) {
       return new Response(JSON.stringify({ status: "duplicate", importId: existing.id }), {
         status: 200,
         headers: { "Content-Type": "application/json" },
       });
     }
 
-    const accessToken = await getGoogleAccessToken();
-    const driveFileId = await uploadFileToDrive(accessToken, filename, file.type, bytes);
+    // Reuse the prior Drive upload on a retry instead of uploading the
+    // same bytes to Drive again.
+    let driveFileId = existing?.drive_file_id ?? null;
+    if (!driveFileId) {
+      const accessToken = await getGoogleAccessToken();
+      driveFileId = await uploadFileToDrive(accessToken, filename, file.type, bytes);
+    }
 
     let weekStart: string | null = null;
     let sessions: { startsAt: string; endsAt: string; subjectLabel: string; faculty: string | null; sessionType: string | null }[] = [];
@@ -112,9 +120,10 @@ Deno.serve(async (req) => {
     // Record the import even on extraction failure — the file is safely
     // in Drive and visible in the archive view either way, and
     // parse_error surfaces why sessions are empty rather than the import
-    // silently vanishing.
-    const importId = crypto.randomUUID();
-    const { error: importErr } = await supabase.from("timetable_imports").insert({
+    // silently vanishing. A retry of a previously-failed checksum updates
+    // that same row rather than inserting a duplicate.
+    const importId = existing?.id ?? crypto.randomUUID();
+    const importRow = {
       id: importId,
       user_id: userId,
       source: "apps_script",
@@ -130,7 +139,10 @@ Deno.serve(async (req) => {
       parse_error: parseError,
       drive_file_id: driveFileId,
       original_filename: filename,
-    });
+    };
+    const { error: importErr } = existing
+      ? await supabase.from("timetable_imports").update(importRow).eq("id", importId)
+      : await supabase.from("timetable_imports").insert(importRow);
     if (importErr) throw new Error(`Failed to record import: ${importErr.message}`);
 
     if (weekStart && sessions.length > 0) {

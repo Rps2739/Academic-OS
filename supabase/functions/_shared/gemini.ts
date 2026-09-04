@@ -12,7 +12,12 @@
 // a real bug once in the deterministic parser; keeping it in our own
 // tested code (see toUtcIso below) rather than trusting the model with
 // it is safer than it looks.
-const MODEL = "gemini-2.5-flash";
+// gemini-2.5-flash was retired (confirmed via a live 404 from the API
+// itself on 2026-09-04, naming this as its replacement) — the API's own
+// error message is more current than any hardcoded assumption here, so
+// trust a future retirement error the same way if this needs updating
+// again.
+const MODEL = "gemini-3.6-flash";
 
 export interface ExtractedSession {
   day: "Monday" | "Tuesday" | "Wednesday" | "Thursday" | "Friday" | "Saturday" | "Sunday";
