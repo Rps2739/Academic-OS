@@ -94,6 +94,22 @@ export function TimetableUpload({ localDb, userId, onChanged }: TimetableUploadP
     setConfirming(true);
     setError(null);
     try {
+      // An identical file (by checksum) already imported means there's
+      // nothing new to record — without this check, re-confirming the
+      // same file created a second import whose sessions never got
+      // superseded by anything (the automated pipeline already guards
+      // against this; this path didn't), silently doubling up every
+      // session for that week in the widgets and Calendar.
+      const existingImport = await localDb.raw.select<{ id: string }[]>(
+        "SELECT id FROM timetable_imports WHERE user_id = $1 AND checksum = $2 AND deleted_at IS NULL",
+        [userId, checksum]
+      );
+      if (existingImport.length > 0) {
+        setConfirmed(true);
+        setConfirming(false);
+        return;
+      }
+
       // Supersede whatever was previously scheduled for this week —
       // simple and correct for the desktop path; per-session diffing
       // (a precise "3 classes changed" notification) is the Edge
