@@ -1,6 +1,7 @@
 import { useEffect, useState, type ReactNode } from "react";
 import type { Session } from "@supabase/supabase-js";
-import { GraduationCap, AlertCircle } from "lucide-react";
+import { GraduationCap, AlertCircle, LayoutPanelTop } from "lucide-react";
+import { invoke } from "@tauri-apps/api/core";
 import { supabase } from "../lib/supabase";
 import { initDeepLinkAuthListener, signInWithGoogle, signOut } from "../lib/auth";
 
@@ -85,9 +86,19 @@ export function AuthGate({ children }: AuthGateProps) {
           <span className="topbar__avatar">{initial}</span>
           <span className="topbar__email">{session.user.email}</span>
         </div>
-        <button className="btn btn--ghost" onClick={() => void signOut()}>
-          Sign out
-        </button>
+        <div className="topbar__actions">
+          <button
+            className="btn btn--ghost"
+            title="Show/hide the desktop widget panels"
+            onClick={() => void invoke("toggle_widgets")}
+          >
+            <LayoutPanelTop size={14} strokeWidth={2} />
+            Widgets
+          </button>
+          <button className="btn btn--ghost" onClick={() => void signOut()}>
+            Sign out
+          </button>
+        </div>
       </div>
       {children(session)}
     </>

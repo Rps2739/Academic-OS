@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import type { LocalRow } from "@academic-os/core";
 import type { SqliteLocalDb } from "../lib/sqlite-local-db";
 import { SearchBox } from "./SearchBox";
@@ -10,6 +10,7 @@ interface TreeSidebarProps {
   selectedId: string | null;
   onSelect: (node: LocalRow) => void;
   onChanged: () => void; // called after any mutation, so callers can trigger a sync
+  refreshSignal: number; // bumped by the parent after a remote pull lands — refetch, don't remount
 }
 
 const ROOT_KEY = "__root__";
@@ -18,9 +19,11 @@ function parentKey(parentId: string | null): string {
   return parentId ?? ROOT_KEY;
 }
 
-export function TreeSidebar({ localDb, userId, selectedId, onSelect, onChanged }: TreeSidebarProps) {
+export function TreeSidebar({ localDb, userId, selectedId, onSelect, onChanged, refreshSignal }: TreeSidebarProps) {
   const [childrenByParent, setChildrenByParent] = useState<Record<string, LocalRow[]>>({});
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
+  const expandedRef = useRef(expanded);
+  expandedRef.current = expanded;
 
   const loadChildren = useCallback(
     async (parentId: string | null) => {
@@ -30,9 +33,19 @@ export function TreeSidebar({ localDb, userId, selectedId, onSelect, onChanged }
     [localDb]
   );
 
+  // Refetches root plus every currently-expanded folder — on mount, and
+  // whenever the parent bumps refreshSignal after a mutation or a remote
+  // pull. Deliberately doesn't touch `expanded`/`selectedId` state, unlike
+  // the previous `key={refreshTick}` remount hack, which nuked the whole
+  // tree's expand state (every expanded folder snapping shut) on every
+  // single create/rename/delete/move.
   useEffect(() => {
     void loadChildren(null);
-  }, [loadChildren]);
+    for (const id of expandedRef.current) {
+      void loadChildren(id);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loadChildren, refreshSignal]);
 
   async function createNode(parentId: string | null, kind: "folder" | "page") {
     const siblings = childrenByParent[parentKey(parentId)] ?? [];

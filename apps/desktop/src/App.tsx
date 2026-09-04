@@ -1,7 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import type { LocalRow } from "@academic-os/core";
-import { FileText, NotebookText, ListTodo, LayoutPanelTop } from "lucide-react";
-import { invoke } from "@tauri-apps/api/core";
+import { FileText, NotebookText, ListTodo } from "lucide-react";
 import { AuthGate } from "./components/AuthGate";
 import { TreeSidebar } from "./components/TreeSidebar";
 import { PageEditor } from "./components/PageEditor";
@@ -79,23 +78,16 @@ function MainLayout({ userId }: { userId: string }) {
         >
           <ListTodo size={19} strokeWidth={1.75} />
         </button>
-        <button
-          className="nav-rail__item nav-rail__item--bottom"
-          title="Show/hide desktop widgets"
-          onClick={() => void invoke("toggle_widgets")}
-        >
-          <LayoutPanelTop size={19} strokeWidth={1.75} />
-        </button>
       </nav>
       {view === "notes" ? (
         <>
           <TreeSidebar
-            key={refreshTick /* re-fetch tree after a remote pull lands */}
             localDb={localDb}
             userId={userId}
             selectedId={selected?.id ?? null}
             onSelect={setSelected}
             onChanged={triggerSync}
+            refreshSignal={refreshTick}
           />
           <main className="app-main">
             {selected ? (
