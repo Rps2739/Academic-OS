@@ -52,15 +52,36 @@ async function pull(local: LocalDb, remote: RemoteDb, deviceId: string): Promise
   await local.setMeta(LAST_PULLED_AT_KEY, maxSeen);
 }
 
-/** Send every locally-dirty row up to the server, table by table. */
+/**
+ * Send every locally-dirty row up to the server, table by table.
+ *
+ * Each table's push is isolated in its own try/catch. Without this, one
+ * row that can never satisfy a server-side constraint (e.g. a unique
+ * index violation from a bad duplicate) throws out of remote.push(),
+ * and — because SYNC_TABLES has a fixed order — every table listed
+ * after it would silently stop syncing forever, every round, with
+ * nothing to show for it but confusingly stale data days later. This
+ * closes exactly that gap (see the 2026-09-04 incident where a
+ * duplicate timetable_imports row blocked class_sessions and
+ * attendance_marks from ever pushing). It deliberately does NOT also
+ * isolate individual rows *within* one table's batch upsert — that
+ * would need remote.push() to move off one-upsert-per-table, a bigger
+ * change not needed to close this specific failure mode: a poisoned
+ * row's own table simply stays dirty and retries next round, same as
+ * it already would if the network call itself had failed.
+ */
 async function push(local: LocalDb, remote: RemoteDb): Promise<void> {
   for (const table of SYNC_TABLES) {
     const dirtyRows = await local.listDirty(table);
     if (dirtyRows.length === 0) continue;
 
-    const results = await remote.push(table, dirtyRows);
-    for (const result of results) {
-      await local.clearDirty(table, result.id, result.updated_at);
+    try {
+      const results = await remote.push(table, dirtyRows);
+      for (const result of results) {
+        await local.clearDirty(table, result.id, result.updated_at);
+      }
+    } catch (err) {
+      console.error(`push(${table}) failed — leaving its rows dirty for the next sync round:`, err);
     }
   }
 }

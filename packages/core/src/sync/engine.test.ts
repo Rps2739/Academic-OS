@@ -1,9 +1,34 @@
-import { beforeEach, describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { sync } from "./engine";
 import { createFakeClock } from "./fake-clock";
 import { InMemoryLocalDb } from "./memory-local-db";
 import { InMemoryRemoteDb } from "./memory-remote-db";
-import type { Clock } from "./types";
+import type { TableName } from "./tables";
+import type { Clock, RemoteDb, SyncRow } from "./types";
+
+/**
+ * Wraps a real RemoteDb but makes push() throw for one chosen table —
+ * simulates a row that can never satisfy a server-side constraint
+ * (e.g. a unique index violation), without needing the in-memory fake
+ * itself to understand Postgres constraints.
+ */
+class ThrowsOnPushRemoteDb implements RemoteDb {
+  constructor(
+    private readonly inner: RemoteDb,
+    private readonly failingTable: TableName
+  ) {}
+
+  push(table: TableName, rows: SyncRow[]): Promise<Array<{ id: string; updated_at: string }>> {
+    if (table === this.failingTable) {
+      return Promise.reject(new Error(`simulated constraint violation on ${table}`));
+    }
+    return this.inner.push(table, rows);
+  }
+
+  pull(table: TableName, since: string): Promise<SyncRow[]> {
+    return this.inner.pull(table, since);
+  }
+}
 
 const USER = "11111111-1111-1111-1111-111111111111";
 
@@ -123,6 +148,50 @@ describe("sync engine — Phase 0 gate (design manual §7, §8 task 0.6)", () =>
     const after = await deviceA.getLocal("subjects", "subj-1");
 
     expect(after).toEqual(before);
+  });
+
+  it("a table's push failing doesn't block tables listed after it in SYNC_TABLES", async () => {
+    const { remote, deviceA } = freshWorld();
+    // Mirrors the 2026-09-04 incident exactly: timetable_imports comes
+    // right before class_sessions in SYNC_TABLES, and a row that can
+    // never satisfy a server-side constraint (there, a duplicate
+    // checksum) must not stop class_sessions from syncing too.
+    const flakyRemote = new ThrowsOnPushRemoteDb(remote, "timetable_imports");
+
+    await deviceA.put("timetable_imports", {
+      id: "import-1",
+      user_id: USER,
+      source: "manual_upload",
+      week_start: "2026-01-05",
+      raw: [],
+      checksum: "duplicate-checksum",
+      parsed_ok: true,
+    });
+    await deviceA.put("class_sessions", {
+      id: "session-1",
+      user_id: USER,
+      import_id: "import-1",
+      week_start: "2026-01-05",
+      starts_at: "2026-01-05T09:00:00.000Z",
+      ends_at: "2026-01-05T10:00:00.000Z",
+      subject_label: "Test Subject",
+      status: "scheduled",
+    });
+
+    const consoleErr = vi.spyOn(console, "error").mockImplementation(() => {});
+    await sync(deviceA, flakyRemote, "device-A");
+    consoleErr.mockRestore();
+
+    // The poisoned row stays dirty, ready to retry next round — never
+    // silently dropped or marked clean despite never reaching the server.
+    expect((await deviceA.getLocal("timetable_imports", "import-1"))?.dirty).toBe(true);
+
+    // The table listed AFTER it in SYNC_TABLES must still have synced.
+    // Before the fix, this stayed dirty forever too, purely because of
+    // table ordering — nothing to do with class_sessions itself.
+    expect((await deviceA.getLocal("class_sessions", "session-1"))?.dirty).toBe(false);
+    const onServer = await remote.pull("class_sessions", "1970-01-01T00:00:00.000Z");
+    expect(onServer.find((r) => r.id === "session-1")).toBeDefined();
   });
 });
 
