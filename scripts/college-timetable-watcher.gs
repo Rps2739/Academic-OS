@@ -6,8 +6,21 @@
 // testGmailAndFindTimetables feasibility test lives in). Keep this file
 // and the live script in sync by hand.
 //
-// One-time setup in the Apps Script editor:
-//   1. Project Settings (gear icon) -> Script Properties -> add:
+// One-time setup:
+//   0. Deploy the Edge Function with --no-verify-jwt:
+//        npx supabase functions deploy timetable-ingest --no-verify-jwt
+//      Supabase puts a platform-level "require a Supabase session JWT"
+//      gate in front of every Edge Function by default. Apps Script has
+//      no session to send — it authenticates with the x-ingest-secret
+//      header instead, checked inside the function itself — so without
+//      --no-verify-jwt the platform rejects the request before our code
+//      ever runs (shows up as a 401 UNAUTHORIZED_NO_AUTH_HEADER, not our
+//      own {"error":"unauthorized"} shape). Don't add this flag to any
+//      *other* function (drive-upload, drive-fetch, gtasks-sync) — those
+//      are called from the browser app with a real session JWT and
+//      should keep the platform check on.
+//   1. In the Apps Script editor: Project Settings (gear icon) -> Script
+//      Properties -> add:
 //        EDGE_FUNCTION_URL      = https://<your-project-ref>.supabase.co/functions/v1/timetable-ingest
 //        INGEST_SHARED_SECRET   = <the value you set via `supabase secrets set INGEST_SHARED_SECRET=...`>
 //   2. Run installWatcherTrigger() once (Run button, with it selected in
@@ -33,17 +46,27 @@ function checkAndIngestTimetables() {
   Logger.log('Found ' + threads.length + ' unprocessed timetable thread(s)');
 
   threads.forEach(function (thread) {
+    var allOk = true;
     thread.getMessages().forEach(function (message) {
       message.getAttachments().forEach(function (attachment) {
         if (!/\.xlsx?$/i.test(attachment.getName())) return;
+        var ok = false;
         try {
-          ingestOne_(endpoint, secret, message, attachment);
+          ok = ingestOne_(endpoint, secret, message, attachment);
         } catch (err) {
           Logger.log('Ingest failed for ' + attachment.getName() + ': ' + err);
         }
+        if (!ok) allOk = false;
       });
     });
-    thread.addLabel(label);
+    // Only mark a thread processed once every attachment in it actually
+    // succeeded — labeling on failure would silently skip it forever,
+    // since the search excludes labeled threads.
+    if (allOk) {
+      thread.addLabel(label);
+    } else {
+      Logger.log('Leaving "' + thread.getFirstMessageSubject() + '" unlabeled so it retries next run.');
+    }
   });
 }
 
@@ -62,11 +85,24 @@ function ingestOne_(endpoint, secret, message, attachment) {
     headers: { 'x-ingest-secret': secret },
     muteHttpExceptions: true,
   });
-  Logger.log(attachment.getName() + ' -> ' + res.getResponseCode() + ' ' + res.getContentText());
+  var code = res.getResponseCode();
+  Logger.log(attachment.getName() + ' -> ' + code + ' ' + res.getContentText());
+  return code >= 200 && code < 300;
 }
 
 function getOrCreateLabel_(name) {
   return GmailApp.getUserLabelByName(name) || GmailApp.createLabel(name);
+}
+
+// One-off cleanup: run this once after a run that mislabeled threads
+// despite failing (e.g. the platform-JWT 401 issue — see setup comment).
+// Safe to run any time; it just makes checkAndIngestTimetables reconsider
+// everything again on its next run.
+function unlabelAllForRetry() {
+  var label = GmailApp.getUserLabelByName('AcademicOS-Processed');
+  if (!label) return;
+  label.getThreads().forEach(function (t) { t.removeLabel(label); });
+  Logger.log('Removed AcademicOS-Processed from all threads — next run will retry everything.');
 }
 
 // Run this once to (re)install the recurring watcher trigger. Safe to
