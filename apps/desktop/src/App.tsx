@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import type { LocalRow } from "@academic-os/core";
+import { FileText } from "lucide-react";
 import { AuthGate } from "./components/AuthGate";
 import { TreeSidebar } from "./components/TreeSidebar";
 import { PageEditor } from "./components/PageEditor";
@@ -34,7 +35,11 @@ function MainLayout({ userId }: { userId: string }) {
   }
 
   if (!localDb) {
-    return <div className="app-loading">Starting local database…</div>;
+    return (
+      <div className="app-loading">
+        <span className="spinner" aria-hidden /> Starting local database…
+      </div>
+    );
   }
 
   return (
@@ -58,7 +63,10 @@ function MainLayout({ userId }: { userId: string }) {
             <AttachmentsRail localDb={localDb} userId={userId} node={selected} onChanged={triggerSync} />
           </>
         ) : (
-          <div className="app-main__empty">Select a page, or create one from the sidebar.</div>
+          <div className="app-main__empty">
+            <FileText size={28} strokeWidth={1.5} />
+            <span>Select a page, or create one from the sidebar.</span>
+          </div>
         )}
       </main>
     </div>

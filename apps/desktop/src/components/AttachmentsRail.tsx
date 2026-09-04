@@ -7,6 +7,7 @@ import { tempDir, join } from "@tauri-apps/api/path";
 import { convertFileSrc } from "@tauri-apps/api/core";
 import { WebviewWindow } from "@tauri-apps/api/webviewWindow";
 import { openPath } from "@tauri-apps/plugin-opener";
+import { Paperclip, Image, FileText, FileSpreadsheet, File as FileIcon, X } from "lucide-react";
 
 /** Windows forbids these in filenames; strip them for the cache copy. */
 function sanitizeFilename(name: string): string {
@@ -15,6 +16,15 @@ function sanitizeFilename(name: string): string {
 
 function isPreviewable(mime: string | null): boolean {
   return mime !== null && (mime.startsWith("image/") || mime === "application/pdf");
+}
+
+function fileIconFor(mime: string | null) {
+  if (!mime) return FileIcon;
+  if (mime.startsWith("image/")) return Image;
+  if (mime === "application/pdf") return FileText;
+  if (mime.includes("spreadsheet") || mime.includes("excel")) return FileSpreadsheet;
+  if (mime.includes("word") || mime.includes("document") || mime.includes("presentation")) return FileText;
+  return FileIcon;
 }
 
 interface AttachmentsRailProps {
@@ -170,9 +180,13 @@ export function AttachmentsRail({ localDb, userId, node, onChanged }: Attachment
   return (
     <div className="attachments-rail">
       <div className="attachments-rail__header">
-        <h3 className="attachments-rail__title">Attachments</h3>
-        <button disabled={busy} onClick={() => fileInput.current?.click()}>
-          {busy ? "Uploading…" : "+ Attach file"}
+        <h3 className="attachments-rail__title">
+          <Paperclip size={13} strokeWidth={2} />
+          Attachments
+        </h3>
+        <button className="btn btn--secondary" disabled={busy} onClick={() => fileInput.current?.click()}>
+          {busy && <span className="spinner" aria-hidden />}
+          {busy ? "Uploading…" : "Attach file"}
         </button>
         <input
           ref={fileInput}
@@ -184,19 +198,32 @@ export function AttachmentsRail({ localDb, userId, node, onChanged }: Attachment
       </div>
       {error && <p className="attachments-rail__error">{error}</p>}
       {attachments.length === 0 ? (
-        <p className="attachments-rail__empty">No attachments.</p>
+        <p className="attachments-rail__empty">
+          <Paperclip size={13} strokeWidth={2} />
+          No attachments yet.
+        </p>
       ) : (
         <ul className="attachments-rail__list">
-          {attachments.map((att) => (
-            <li key={att.id as string} className="attachments-rail__item">
-              <button className="attachments-rail__filename" onClick={() => void handleOpen(att)}>
-                {att["filename"] as string}
-              </button>
-              <button className="attachments-rail__delete" onClick={() => void handleDelete(att)}>
-                ×
-              </button>
-            </li>
-          ))}
+          {attachments.map((att) => {
+            const Icon = fileIconFor(att["mime"] as string | null);
+            return (
+              <li key={att.id as string} className="attachments-rail__item">
+                <span className="attachments-rail__item-icon">
+                  <Icon size={16} strokeWidth={1.75} />
+                </span>
+                <button className="attachments-rail__filename" onClick={() => void handleOpen(att)}>
+                  {att["filename"] as string}
+                </button>
+                <button
+                  className="icon-btn icon-btn--danger"
+                  title="Remove"
+                  onClick={() => void handleDelete(att)}
+                >
+                  <X size={13} strokeWidth={2} />
+                </button>
+              </li>
+            );
+          })}
         </ul>
       )}
     </div>

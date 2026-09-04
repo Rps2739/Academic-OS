@@ -1,5 +1,6 @@
 import { useEffect, useState, type ReactNode } from "react";
 import type { Session } from "@supabase/supabase-js";
+import { GraduationCap, AlertCircle } from "lucide-react";
 import { supabase } from "../lib/supabase";
 import { initDeepLinkAuthListener, signInWithGoogle, signOut } from "../lib/auth";
 
@@ -43,9 +44,13 @@ export function AuthGate({ children }: AuthGateProps) {
   if (!session) {
     return (
       <div className="auth-gate">
+        <div className="auth-gate__mark">
+          <GraduationCap size={26} strokeWidth={2} />
+        </div>
         <h1>Academic OS</h1>
         <p>Sign in with your personal Google account to continue.</p>
         <button
+          className="btn btn--primary"
           disabled={signingIn}
           onClick={async () => {
             setError(null);
@@ -58,18 +63,31 @@ export function AuthGate({ children }: AuthGateProps) {
             }
           }}
         >
+          {signingIn && <span className="spinner" aria-hidden />}
           {signingIn ? "Opening browser…" : "Sign in with Google"}
         </button>
-        {error && <p className="auth-gate__error">{error}</p>}
+        {error && (
+          <div className="auth-gate__error">
+            <AlertCircle size={14} strokeWidth={2} />
+            <span>{error}</span>
+          </div>
+        )}
       </div>
     );
   }
 
+  const initial = (session.user.email ?? "?").charAt(0).toUpperCase();
+
   return (
     <>
       <div className="topbar">
-        <span>{session.user.email}</span>
-        <button onClick={() => void signOut()}>Sign out</button>
+        <div className="topbar__identity">
+          <span className="topbar__avatar">{initial}</span>
+          <span className="topbar__email">{session.user.email}</span>
+        </div>
+        <button className="btn btn--ghost" onClick={() => void signOut()}>
+          Sign out
+        </button>
       </div>
       {children(session)}
     </>

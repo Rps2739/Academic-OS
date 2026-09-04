@@ -1,6 +1,7 @@
 import { useState } from "react";
 import type { LocalRow } from "@academic-os/core";
 import type { SqliteLocalDb } from "../lib/sqlite-local-db";
+import { Search, Folder, FileText } from "lucide-react";
 
 interface SearchResult {
   node: LocalRow;
@@ -66,19 +67,26 @@ export function SearchBox({ localDb, onSelect }: SearchBoxProps) {
 
   return (
     <div className="search-box">
-      <input
-        type="search"
-        className="search-box__input"
-        placeholder="Search notes and files…"
-        value={query}
-        onChange={(e) => {
-          setQuery(e.target.value);
-          void runSearch(e.target.value);
-        }}
-      />
+      <div className="search-box__field">
+        <Search size={14} strokeWidth={2} />
+        <input
+          type="search"
+          className="search-box__input"
+          placeholder="Search notes and files…"
+          value={query}
+          onChange={(e) => {
+            setQuery(e.target.value);
+            void runSearch(e.target.value);
+          }}
+        />
+      </div>
       {query.trim().length >= 2 && (
         <ul className="search-box__results">
-          {searching && <li className="search-box__empty">Searching…</li>}
+          {searching && (
+            <li className="search-box__empty">
+              <span className="spinner" aria-hidden /> Searching…
+            </li>
+          )}
           {!searching && results.length === 0 && <li className="search-box__empty">No matches.</li>}
           {results.map((r) => (
             <li
@@ -91,7 +99,12 @@ export function SearchBox({ localDb, onSelect }: SearchBoxProps) {
               }}
             >
               <div className="search-box__result-title">
-                {r.node["kind"] === "page" ? "📄" : "📁"} {r.node["title"] as string}
+                {r.node["kind"] === "page" ? (
+                  <FileText size={13} strokeWidth={2} />
+                ) : (
+                  <Folder size={13} strokeWidth={2} />
+                )}
+                {r.node["title"] as string}
               </div>
               <div className="search-box__result-snippet">{r.snippet}</div>
             </li>
