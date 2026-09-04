@@ -1429,7 +1429,8 @@ body.widget-window {
 }
 
 .widget-task--full:hover .widget-task__flag,
-.widget-task--full:hover .widget-task__delete {
+.widget-task--full:hover .widget-task__delete,
+.widget-class:hover .widget-task__delete {
   opacity: 1;
 }
 
