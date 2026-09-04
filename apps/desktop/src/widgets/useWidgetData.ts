@@ -15,6 +15,19 @@ export function useWidgetData() {
   useEffect(() => {
     void supabase.auth.getSession().then(({ data }) => setUserId(data.session?.user.id ?? null));
     void SqliteLocalDb.open().then(setLocalDb);
+
+    // Widget windows open independently of the main window and may
+    // already be open when sign-in completes there — without this,
+    // a widget that captured "signed out" at mount would show that
+    // forever, since Supabase's client shares session state across
+    // windows via localStorage but only pushes updates through this
+    // subscription, not the one-time getSession() call above.
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_event, session) => {
+      setUserId(session?.user.id ?? null);
+    });
+    return () => subscription.unsubscribe();
   }, []);
 
   return { userId, localDb, loading: userId === undefined || localDb === null };
