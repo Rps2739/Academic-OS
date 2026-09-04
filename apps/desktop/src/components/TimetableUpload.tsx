@@ -32,7 +32,11 @@ function formatDayLabel(dateStr: string): string {
 }
 
 function formatTime(iso: string): string {
-  return new Date(iso).toLocaleTimeString([], { hour: "numeric", minute: "2-digit", timeZone: "UTC" });
+  // Plain local-time display — startsAt/endsAt are genuine UTC (the
+  // normalizer already converts from the sheet's IST times), so no
+  // special-casing needed here, unlike formatDayLabel above which
+  // deliberately works with a bare date string, not a real timestamp.
+  return new Date(iso).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
 }
 
 /**

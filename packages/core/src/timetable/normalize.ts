@@ -217,12 +217,21 @@ export function normalizeTimetableGrid(
         warnings.push(`"${rawLabel}" on ${dateStr} has no matching row in the course legend`);
       }
 
+      // The sheet's times are India Standard Time (the college is in
+      // Bengaluru; IST is also this app's default timezone —
+      // user_settings.timezone). Subtracting the UTC+5:30 offset here
+      // makes startsAt/endsAt genuine UTC, so every ordinary local-time
+      // display elsewhere in the app (the widgets, this same upload
+      // screen's own preview) just works without needing to know these
+      // particular timestamps are special and require forcing UTC
+      // display to undo a fake-UTC storage convention.
+      const IST_OFFSET_MINUTES = 5 * 60 + 30;
       const startsAt = new Date(weekStart);
       startsAt.setUTCDate(startsAt.getUTCDate() + day);
-      startsAt.setUTCHours(0, startRange.startMinutes, 0, 0);
+      startsAt.setUTCHours(0, startRange.startMinutes - IST_OFFSET_MINUTES, 0, 0);
       const endsAt = new Date(weekStart);
       endsAt.setUTCDate(endsAt.getUTCDate() + day);
-      endsAt.setUTCHours(0, endRange.endMinutes, 0, 0);
+      endsAt.setUTCHours(0, endRange.endMinutes - IST_OFFSET_MINUTES, 0, 0);
 
       sessions.push({
         weekStart: toISODate(weekStart),

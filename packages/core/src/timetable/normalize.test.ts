@@ -36,10 +36,12 @@ describe.skipIf(!haveFixtures)("parseTimetableWorkbook (real fixtures)", () => {
     const tm20 = result.sessions.find((s) => s.subjectLabel === "TM (AG)" && s.sessionType === "Session 20");
     expect(tm20).toBeDefined();
     expect(tm20?.faculty).toBe("Dr. Anuradha Goswami");
-    // Tuesday (day index 1), slot "11:00 -12:15PM" — the exact slot this
-    // AM/PM-crossing bug would silently corrupt if it regressed.
-    expect(tm20?.startsAt).toBe("2026-09-01T11:00:00.000Z");
-    expect(tm20?.endsAt).toBe("2026-09-01T12:15:00.000Z");
+    // Tuesday (day index 1), slot "11:00 -12:15PM" IST — the exact slot
+    // this AM/PM-crossing bug would silently corrupt if it regressed.
+    // Stored as genuine UTC (IST minus 5:30), not the sheet's raw IST
+    // wall-clock time.
+    expect(tm20?.startsAt).toBe("2026-09-01T05:30:00.000Z");
+    expect(tm20?.endsAt).toBe("2026-09-01T06:45:00.000Z");
   });
 
   it("parses a named non-class event with no session number or faculty", () => {
@@ -58,9 +60,10 @@ describe.skipIf(!haveFixtures)("parseTimetableWorkbook (real fixtures)", () => {
     expect(alchemy.length).toBe(4);
     const fridayFirst = alchemy.find((s) => s.startsAt.startsWith("2026-09-04"));
     expect(fridayFirst).toBeDefined();
-    // Spans "9:30-10:45AM" through "12:30-1:45PM" in one merge.
-    expect(fridayFirst?.startsAt).toBe("2026-09-04T09:30:00.000Z");
-    expect(fridayFirst?.endsAt).toBe("2026-09-04T13:45:00.000Z");
+    // Spans "9:30-10:45AM" through "12:30-1:45PM" IST in one merge,
+    // stored as genuine UTC (IST minus 5:30).
+    expect(fridayFirst?.startsAt).toBe("2026-09-04T04:00:00.000Z");
+    expect(fridayFirst?.endsAt).toBe("2026-09-04T08:15:00.000Z");
   });
 
   it("has no unparsed-warning surprises on the real sheet", () => {
