@@ -44,6 +44,7 @@ scripts/                  one-off scripts the user runs themselves (e.g. OAuth r
 - **This repo has no git remote** (fully local) — the user explicitly declined setting one up. Don't suggest pushing/creating one unprompted.
 - Windows/Office refuses to open files from the app's own AppData folder — Drive downloads are cached under `%TEMP%/academicos/`, not app-private storage. Keep using that pattern for anything the OS needs to open externally.
 - `supabase.functions.invoke()` mis-handles binary responses for non-standard mimetypes (corrupts `.xlsx` downloads) — for any Edge Function returning binary, use a raw `fetch()` with the session JWT attached manually (see `drive-fetch` callers in `AttachmentsRail.tsx` / `TimetableArchive.tsx` for the exact pattern), not `functions.invoke()`.
+- Any Edge Function that **doesn't** authenticate via a forwarded Supabase session JWT (e.g. `timetable-ingest`, called by Apps Script with a custom shared-secret header instead) must be deployed with `npx supabase functions deploy <name> --no-verify-jwt`, or Supabase's platform-level gate rejects every request before the function's own code runs. Do not add that flag to functions that *are* called with a real session JWT (`drive-upload`, `drive-fetch`, `gtasks-sync`) — they should keep the platform check on.
 
 ## Running things
 
