@@ -1,7 +1,7 @@
 // Streams a file back from the app owner's personal Google Drive by id.
 // Same rationale as drive-upload: the client only ever talks to this
 // function, never to Google, and never sees a Google credential.
-import { getDriveAccessToken } from "../_shared/google-drive.ts";
+import { getGoogleAccessToken } from "../_shared/google-oauth.ts";
 import { corsHeaders } from "../_shared/cors.ts";
 
 Deno.serve(async (req) => {
@@ -21,7 +21,7 @@ Deno.serve(async (req) => {
       });
     }
 
-    const accessToken = await getDriveAccessToken();
+    const accessToken = await getGoogleAccessToken();
 
     const fileRes = await fetch(
       `https://www.googleapis.com/drive/v3/files/${encodeURIComponent(driveFileId)}?alt=media`,

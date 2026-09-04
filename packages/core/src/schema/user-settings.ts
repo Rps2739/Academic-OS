@@ -12,6 +12,7 @@ export const userSettingsSchema = z.object({
   timezone: z.string().default("Asia/Kolkata"),
   drive_folder_id: z.string().nullable(),
   gcal_calendar_id: z.string().nullable(),
+  gtasks_list_id: z.string().nullable().optional(),
   ingest_secret_hash: z.string().nullable(),
   gemini_key_ref: z.string().nullable(),
   created_at: z.string().datetime(),

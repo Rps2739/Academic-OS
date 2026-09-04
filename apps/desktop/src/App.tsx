@@ -9,6 +9,7 @@ import { AttachmentsRail } from "./components/AttachmentsRail";
 import { TaskList } from "./components/TaskList";
 import { SqliteLocalDb } from "./lib/sqlite-local-db";
 import { createSyncController } from "./lib/sync-loop";
+import { createGTasksSyncController } from "./lib/gtasks-sync-loop";
 import { enable as enableAutostart, isEnabled as isAutostartEnabled } from "@tauri-apps/plugin-autostart";
 import "./App.css";
 
@@ -32,6 +33,12 @@ function MainLayout({ userId }: { userId: string }) {
       const controller = createSyncController(db, deviceId);
       syncRef.current = controller;
       controller.start();
+
+      // Google Tasks sync writes straight to Postgres; this just makes
+      // sure the local mirror picks it up promptly instead of waiting
+      // for the main sync loop's own next interval.
+      const gtasks = createGTasksSyncController(() => controller.triggerSync());
+      gtasks.start();
     });
 
     // The app is meant to always be running (it's what keeps the desktop

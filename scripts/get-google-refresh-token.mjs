@@ -1,32 +1,42 @@
 #!/usr/bin/env node
 // One-time script: obtains a Google OAuth refresh token, scoped to
-// drive.file, for the personal account the Edge Functions (drive-upload /
-// drive-fetch) act as. Run once, copy the printed refresh_token straight
-// into `supabase secrets set` yourself — this script never writes it to
-// disk and this repo never sees it.
+// drive.file + tasks, for the personal account the Edge Functions
+// (drive-upload / drive-fetch / gtasks-sync) act as. Run once, copy the
+// printed refresh_token straight into `supabase secrets set` yourself —
+// this script never writes it to disk and this repo never sees it.
+//
+// Re-run this (and re-set the secret) any time the scope list changes —
+// a refresh token only carries the scopes it was originally granted
+// with, so adding "tasks" here means an OLD drive-only refresh token
+// stops being enough and needs replacing, not just adding to.
 //
 // Prerequisites (Google Cloud Console, on the SAME OAuth client already
 // used for Supabase Google sign-in):
-//   1. APIs & Services -> Library -> enable "Google Drive API".
+//   1. APIs & Services -> Library -> enable "Google Drive API" and
+//      "Google Tasks API".
 //   2. APIs & Services -> Credentials -> open that OAuth client -> Edit ->
 //      Authorized redirect URIs -> add http://127.0.0.1:53682/callback
+//      (skip if already added from the Drive-only run).
 //
 // Usage (PowerShell):
 //   $env:GOOGLE_CLIENT_ID = "..."
 //   $env:GOOGLE_CLIENT_SECRET = "..."
-//   node scripts/get-drive-refresh-token.mjs
+//   node scripts/get-google-refresh-token.mjs
 //
 // The script opens your browser, you approve access to your OWN personal
-// Drive, and it prints a refresh_token once. Store it immediately with:
-//   npx supabase secrets set GOOGLE_DRIVE_REFRESH_TOKEN=<value>
-// then close this terminal. Do not paste the token anywhere else.
+// Drive + Tasks, and it prints a refresh_token once. Store it immediately
+// with the command it prints, then close this terminal. Do not paste the
+// token anywhere else.
 
 import { createServer } from "node:http";
 import { randomBytes, createHash } from "node:crypto";
 
 const PORT = 53682;
 const REDIRECT_URI = `http://127.0.0.1:${PORT}/callback`;
-const SCOPE = "https://www.googleapis.com/auth/drive.file";
+const SCOPES = [
+  "https://www.googleapis.com/auth/drive.file",
+  "https://www.googleapis.com/auth/tasks",
+].join(" ");
 
 const clientId = process.env.GOOGLE_CLIENT_ID;
 const clientSecret = process.env.GOOGLE_CLIENT_SECRET;
@@ -49,10 +59,10 @@ const authUrl = new URL("https://accounts.google.com/o/oauth2/v2/auth");
 authUrl.searchParams.set("client_id", clientId);
 authUrl.searchParams.set("redirect_uri", REDIRECT_URI);
 authUrl.searchParams.set("response_type", "code");
-authUrl.searchParams.set("scope", SCOPE);
+authUrl.searchParams.set("scope", SCOPES);
 authUrl.searchParams.set("access_type", "offline");
 // Forces the consent screen every run, which is what makes Google reissue
-// a refresh_token even if this scope was already granted before.
+// a refresh_token even if these scopes were already granted before.
 authUrl.searchParams.set("prompt", "consent");
 authUrl.searchParams.set("code_challenge", codeChallenge);
 authUrl.searchParams.set("code_challenge_method", "S256");

@@ -5,7 +5,7 @@
 // holds the only Google credentials that exist anywhere (see
 // _shared/google-drive.ts). Requires a valid Supabase session — Edge
 // Functions verify the JWT before this code runs.
-import { getDriveAccessToken } from "../_shared/google-drive.ts";
+import { getGoogleAccessToken } from "../_shared/google-oauth.ts";
 import { corsHeaders } from "../_shared/cors.ts";
 
 Deno.serve(async (req) => {
@@ -27,7 +27,7 @@ Deno.serve(async (req) => {
       });
     }
 
-    const accessToken = await getDriveAccessToken();
+    const accessToken = await getGoogleAccessToken();
 
     const boundary = "academicos-" + crypto.randomUUID();
     const enc = new TextEncoder();

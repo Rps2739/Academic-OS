@@ -14,6 +14,11 @@ export const taskSchema = syncableBase.extend({
   sort_order: z.number(),
   node_id: z.string().uuid().nullable(),
   project_id: z.string().uuid().nullable(),
+  // Set by the gtasks-sync Edge Function; never read or written by the
+  // client directly, and not part of the local SQLite mirror (the sync
+  // engine's TABLE_COLUMNS simply doesn't list it, so pulled rows drop
+  // it silently — no local schema change needed for this to work).
+  google_task_id: z.string().nullable().optional(),
 });
 
 export type Task = z.infer<typeof taskSchema>;
