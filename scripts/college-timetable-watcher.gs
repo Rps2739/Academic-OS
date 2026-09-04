@@ -38,55 +38,45 @@ function checkAndIngestTimetables() {
     return;
   }
 
-  var label = getOrCreateLabel_('AcademicOS-Processed');
   // subject:Timetable narrows out the unrelated .xlsx attachments
   // (scoresheets, CV drives, etc.) that a bare has:attachment search
   // also matched during testing. after: a rolling 10-day window keeps
   // this scoped to "this week and every week from now on" — without it,
   // the very first run swept up the entire semester's backlog of old
   // timetable emails in one go and blew through the Gemini free tier's
-  // daily quota. 10 days comfortably covers a timetable sent a few days
-  // early plus any mid-week revision; it never needs updating since it's
-  // computed fresh on every run.
+  // daily quota.
+  //
+  // Deliberately no -label:/already-processed exclusion here: an
+  // earlier version marked whole THREADS processed and skipped them on
+  // future scans, which silently misses a mid-week revision sent as a
+  // REPLY within an already-seen thread (this college does exactly
+  // that — "kindly ignore previous mail" replies in the same thread,
+  // observed directly in this inbox). Re-scanning the same handful of
+  // threads every hour is cheap and correct instead: timetable-ingest's
+  // own checksum check makes re-seeing an already-ingested attachment a
+  // fast no-op ({"status":"duplicate"}), not a wasted Gemini call.
   var threads = GmailApp.search(
-    'subject:Timetable has:attachment filename:xlsx after:' + searchWindowStart_() + ' -label:AcademicOS-Processed',
+    'subject:Timetable has:attachment filename:xlsx after:' + searchWindowStart_(),
     0,
     20
   );
-  Logger.log('Found ' + threads.length + ' unprocessed timetable thread(s)');
+  Logger.log('Scanning ' + threads.length + ' timetable thread(s) from the last 10 days');
 
   threads.forEach(function (thread) {
-    var allOk = true;
     thread.getMessages().forEach(function (message) {
       message.getAttachments().forEach(function (attachment) {
         if (!/\.xlsx?$/i.test(attachment.getName())) return;
-        var ok = false;
         try {
-          ok = ingestOne_(endpoint, secret, message, attachment);
-          // A big backlog run (many unprocessed threads at once, e.g.
-          // the first-ever run) fires one Gemini extraction per
-          // attachment in a tight loop, which is exactly what tripped a
-          // 503 "high demand" response against a fresh API key's
-          // per-minute quota in practice. The Edge Function itself
-          // already retries a single request with backoff; this spaces
-          // the requests out so a big backlog doesn't cause that in the
-          // first place. Ordinary hourly runs only see 0-1 new threads,
-          // so this adds no real delay in steady state.
+          ingestOne_(endpoint, secret, message, attachment);
+          // Pacing in case more than one attachment needs a real (non-
+          // duplicate) ingest in the same run — see gemini.ts's own
+          // retry-with-backoff for why a burst matters.
           Utilities.sleep(4000);
         } catch (err) {
           Logger.log('Ingest failed for ' + attachment.getName() + ': ' + err);
         }
-        if (!ok) allOk = false;
       });
     });
-    // Only mark a thread processed once every attachment in it actually
-    // succeeded — labeling on failure would silently skip it forever,
-    // since the search excludes labeled threads.
-    if (allOk) {
-      thread.addLabel(label);
-    } else {
-      Logger.log('Leaving "' + thread.getFirstMessageSubject() + '" unlabeled so it retries next run.');
-    }
   });
 }
 
@@ -105,45 +95,13 @@ function ingestOne_(endpoint, secret, message, attachment) {
     headers: { 'x-ingest-secret': secret },
     muteHttpExceptions: true,
   });
-  var code = res.getResponseCode();
-  var text = res.getContentText();
-  Logger.log(attachment.getName() + ' -> ' + code + ' ' + text);
-  if (code < 200 || code >= 300) return false;
-
-  // The Edge Function deliberately still responds 200 when extraction
-  // itself failed (e.g. a Gemini rate limit) — it records the attempt
-  // rather than losing the file. Only "duplicate" or a clean "ok" with
-  // no parseError counts as actually done; anything else should stay
-  // unlabeled so the next hourly run retries it (cheap — the function
-  // reuses the Drive upload and just re-calls Gemini for a checksum it
-  // already has on file).
-  try {
-    var body = JSON.parse(text);
-    return body.status === 'duplicate' || (body.status === 'ok' && !body.parseError);
-  } catch (err) {
-    return false;
-  }
-}
-
-function getOrCreateLabel_(name) {
-  return GmailApp.getUserLabelByName(name) || GmailApp.createLabel(name);
+  Logger.log(attachment.getName() + ' -> ' + res.getResponseCode() + ' ' + res.getContentText());
 }
 
 function searchWindowStart_() {
   var d = new Date();
   d.setDate(d.getDate() - 10);
   return Utilities.formatDate(d, Session.getScriptTimeZone(), 'yyyy/MM/dd');
-}
-
-// One-off cleanup: run this once after a run that mislabeled threads
-// despite failing (e.g. the platform-JWT 401 issue — see setup comment).
-// Safe to run any time; it just makes checkAndIngestTimetables reconsider
-// everything again on its next run.
-function unlabelAllForRetry() {
-  var label = GmailApp.getUserLabelByName('AcademicOS-Processed');
-  if (!label) return;
-  label.getThreads().forEach(function (t) { t.removeLabel(label); });
-  Logger.log('Removed AcademicOS-Processed from all threads — next run will retry everything.');
 }
 
 // Run this once to (re)install the recurring watcher trigger. Safe to
