@@ -8,7 +8,20 @@ import { QuickCapture } from "./widgets/QuickCapture";
 import "./App.css";
 
 const WIDGET_LABELS = ["widget-tasks", "widget-classes", "quick-capture"];
-const label = getCurrentWindow().label;
+
+// getCurrentWindow() reads Tauri's IPC-injected window metadata, which
+// can occasionally not be fully populated yet the instant this module
+// evaluates (a startup race, not something under our control) — every
+// window shares this one entry point, so if this throws uncaught,
+// NOTHING renders anywhere, in any window. Default to "main" or the
+// window's own DOM title, so a rare timing miss shows the main app
+// instead of a blank screen.
+let label = "main";
+try {
+  label = getCurrentWindow().label;
+} catch (err) {
+  console.error("getCurrentWindow() failed at startup, defaulting to main:", err);
+}
 
 // The main window is opaque (App.css paints --bg on body); widget windows
 // are OS-level transparent + frameless, so the page background must be
