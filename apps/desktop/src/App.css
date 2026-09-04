@@ -1139,3 +1139,161 @@ input {
   filter: invert(0.6);
   cursor: pointer;
 }
+
+/* ============================================================
+   Desktop widget panels (always-on-top, frameless, transparent)
+   ============================================================ */
+body.widget-window {
+  background: transparent;
+}
+
+.widget-panel {
+  display: flex;
+  flex-direction: column;
+  width: 100vw;
+  height: 100vh;
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--border-strong);
+  background: var(--surface);
+  box-shadow: var(--shadow-lg);
+  overflow: hidden;
+}
+
+.widget-panel__header {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  height: 34px;
+  padding: 0 var(--space-3);
+  flex-shrink: 0;
+  border-bottom: 1px solid var(--border);
+  color: var(--muted);
+  font-size: var(--text-xs);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  /* data-tauri-drag-region on the JSX element makes this bar draggable;
+     without a non-zero height nothing is there to grab. */
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+.widget-panel__body {
+  flex: 1;
+  overflow-y: auto;
+  padding: var(--space-2);
+}
+
+.widget-panel__empty {
+  margin: var(--space-4) 0 0;
+  color: var(--muted-2);
+  font-size: var(--text-xs);
+  text-align: center;
+}
+
+.widget-panel__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.widget-task {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-1) var(--space-2);
+  border-radius: var(--radius-sm);
+}
+
+.widget-task:hover {
+  background: var(--surface-2);
+}
+
+.widget-task__check {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 15px;
+  height: 15px;
+  flex-shrink: 0;
+  border: 1.5px solid var(--border-strong);
+  border-radius: var(--radius-full);
+  background: none;
+  color: var(--on-accent);
+  cursor: pointer;
+}
+
+.widget-task__check:hover {
+  border-color: var(--accent);
+  background: var(--accent-tint);
+}
+
+.widget-task__title {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--ink-secondary);
+  font-size: var(--text-sm);
+}
+
+.widget-class {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-2);
+  padding: var(--space-2);
+  border-radius: var(--radius-sm);
+}
+
+.widget-class:hover {
+  background: var(--surface-2);
+}
+
+.widget-class__time {
+  flex-shrink: 0;
+  color: var(--accent-hover);
+  font-size: var(--text-xs);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.widget-class__subject {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--ink-secondary);
+  font-size: var(--text-sm);
+}
+
+.widget-class__room {
+  flex-shrink: 0;
+  color: var(--muted);
+  font-size: var(--text-xs);
+}
+
+.widget-panel--capture {
+  justify-content: center;
+  padding: 0 var(--space-3);
+}
+
+.quick-capture__input {
+  width: 100%;
+  border: none;
+  background: none;
+  color: var(--ink);
+  font-size: var(--text-md);
+}
+
+.quick-capture__input:focus {
+  outline: none;
+}
+
+.quick-capture__input::placeholder {
+  color: var(--muted);
+}

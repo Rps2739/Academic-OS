@@ -8,6 +8,7 @@ import { AttachmentsRail } from "./components/AttachmentsRail";
 import { TaskList } from "./components/TaskList";
 import { SqliteLocalDb } from "./lib/sqlite-local-db";
 import { createSyncController } from "./lib/sync-loop";
+import { enable as enableAutostart, isEnabled as isAutostartEnabled } from "@tauri-apps/plugin-autostart";
 import "./App.css";
 
 type View = "notes" | "tasks";
@@ -30,6 +31,13 @@ function MainLayout({ userId }: { userId: string }) {
       const controller = createSyncController(db, deviceId);
       syncRef.current = controller;
       controller.start();
+    });
+
+    // The app is meant to always be running (it's what keeps the desktop
+    // widgets and the Ctrl+Alt+N capture shortcut alive) — enable
+    // launch-at-login once rather than asking the user to find a setting.
+    void isAutostartEnabled().then((already) => {
+      if (!already) void enableAutostart();
     });
   }, []);
 

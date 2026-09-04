@@ -18,6 +18,38 @@
         "height": 800,
         "minWidth": 800,
         "minHeight": 600
+      },
+      {
+        "label": "widget-tasks",
+        "title": "Tasks",
+        "width": 280,
+        "height": 360,
+        "x": 40,
+        "y": 40,
+        "decorations": false,
+        "transparent": true,
+        "alwaysOnTop": true,
+        "skipTaskbar": true,
+        "shadow": false,
+        "resizable": true,
+        "minWidth": 220,
+        "minHeight": 200
+      },
+      {
+        "label": "widget-classes",
+        "title": "Today",
+        "width": 280,
+        "height": 260,
+        "x": 40,
+        "y": 420,
+        "decorations": false,
+        "transparent": true,
+        "alwaysOnTop": true,
+        "skipTaskbar": true,
+        "shadow": false,
+        "resizable": true,
+        "minWidth": 220,
+        "minHeight": 160
       }
     ],
     "security": {

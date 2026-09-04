@@ -1,6 +1,9 @@
 use std::io::{Read, Write};
 use std::net::TcpListener;
-use tauri::{Emitter, Manager};
+use tauri::menu::{Menu, MenuItem};
+use tauri::tray::TrayIconBuilder;
+use tauri::{Emitter, Manager, WebviewUrl, WebviewWindowBuilder};
+use tauri_plugin_global_shortcut::ShortcutState;
 use tauri_plugin_sql::{Migration, MigrationKind};
 
 const DB_URL: &str = "sqlite:academic-os.db";
@@ -156,6 +159,37 @@ fn migrations() -> Vec<Migration> {
     }]
 }
 
+/// Opened by the tray menu's "Quick capture" item and by the global
+/// Ctrl+Alt+N shortcut (design manual §2.6) — focuses the existing
+/// window rather than stacking duplicates if it's already open.
+fn open_quick_capture(app: &tauri::AppHandle) {
+    if let Some(window) = app.get_webview_window("quick-capture") {
+        let _ = window.set_focus();
+        return;
+    }
+    let _ = WebviewWindowBuilder::new(app, "quick-capture", WebviewUrl::App("index.html".into()))
+        .title("Quick capture")
+        .inner_size(480.0, 56.0)
+        .decorations(false)
+        .transparent(true)
+        .always_on_top(true)
+        .skip_taskbar(true)
+        .shadow(false)
+        .resizable(false)
+        .center()
+        .build();
+}
+
+/// Tray menu's "Toggle panels" — shows or hides both desktop widgets together.
+fn toggle_widget_panels(app: &tauri::AppHandle) {
+    for label in ["widget-tasks", "widget-classes"] {
+        if let Some(window) = app.get_webview_window(label) {
+            let visible = window.is_visible().unwrap_or(true);
+            let _ = if visible { window.hide() } else { window.show() };
+        }
+    }
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -175,7 +209,52 @@ pub fn run() {
                 .add_migrations(DB_URL, migrations())
                 .build(),
         )
+        // Persists position/size for every window (including the two
+        // widget panels) across restarts automatically — design manual §2.3.
+        .plugin(tauri_plugin_window_state::Builder::default().build())
+        .plugin(tauri_plugin_autostart::Builder::new().build())
+        // Ctrl+Alt+N opens quick-capture from anywhere, main window or not.
+        .plugin(
+            tauri_plugin_global_shortcut::Builder::new()
+                .with_shortcut("Ctrl+Alt+N")
+                .expect("Ctrl+Alt+N is a valid shortcut string")
+                .with_handler(|app, _shortcut, event| {
+                    if event.state() == ShortcutState::Pressed {
+                        open_quick_capture(app);
+                    }
+                })
+                .build(),
+        )
         .invoke_handler(tauri::generate_handler![start_oauth_server])
+        .setup(|app| {
+            // Tray icon — v2 API is TrayIconBuilder, not v1's SystemTray.
+            let open_i = MenuItem::with_id(app, "open", "Open", true, None::<&str>)?;
+            let capture_i =
+                MenuItem::with_id(app, "capture", "Quick capture", true, Some("Ctrl+Alt+N"))?;
+            let toggle_i = MenuItem::with_id(app, "toggle", "Toggle panels", true, None::<&str>)?;
+            let quit_i = MenuItem::with_id(app, "quit", "Quit", true, None::<&str>)?;
+            let menu = Menu::with_items(app, &[&open_i, &capture_i, &toggle_i, &quit_i])?;
+
+            TrayIconBuilder::new()
+                .icon(app.default_window_icon().unwrap().clone())
+                .menu(&menu)
+                .show_menu_on_left_click(true)
+                .on_menu_event(|app, event| match event.id().as_ref() {
+                    "open" => {
+                        if let Some(window) = app.get_webview_window("main") {
+                            let _ = window.show();
+                            let _ = window.set_focus();
+                        }
+                    }
+                    "capture" => open_quick_capture(app),
+                    "toggle" => toggle_widget_panels(app),
+                    "quit" => app.exit(0),
+                    _ => {}
+                })
+                .build(app)?;
+
+            Ok(())
+        })
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }
