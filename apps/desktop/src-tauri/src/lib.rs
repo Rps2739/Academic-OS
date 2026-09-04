@@ -180,14 +180,27 @@ fn open_quick_capture(app: &tauri::AppHandle) {
         .build();
 }
 
-/// Tray menu's "Toggle panels" — shows or hides both desktop widgets together.
+/// Tray menu's "Toggle panels", and the main window's own widgets button
+/// (JS calls this via the `toggle_widget_panels` command below — a user
+/// can close one panel with its own header button without ever opening
+/// the tray, so treating each panel's *own* visibility independently
+/// here would make the two controls disagree). Shows both if either is
+/// hidden; hides both only when both are already visible.
 fn toggle_widget_panels(app: &tauri::AppHandle) {
-    for label in ["widget-tasks", "widget-classes"] {
+    let labels = ["widget-tasks", "widget-classes"];
+    let all_visible = labels
+        .iter()
+        .all(|l| app.get_webview_window(l).and_then(|w| w.is_visible().ok()).unwrap_or(false));
+    for label in labels {
         if let Some(window) = app.get_webview_window(label) {
-            let visible = window.is_visible().unwrap_or(true);
-            let _ = if visible { window.hide() } else { window.show() };
+            let _ = if all_visible { window.hide() } else { window.show() };
         }
     }
+}
+
+#[tauri::command]
+fn toggle_widgets(app: tauri::AppHandle) {
+    toggle_widget_panels(&app);
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -225,7 +238,7 @@ pub fn run() {
                 })
                 .build(),
         )
-        .invoke_handler(tauri::generate_handler![start_oauth_server])
+        .invoke_handler(tauri::generate_handler![start_oauth_server, toggle_widgets])
         .setup(|app| {
             // Tray icon — v2 API is TrayIconBuilder, not v1's SystemTray.
             let open_i = MenuItem::with_id(app, "open", "Open", true, None::<&str>)?;
