@@ -1,12 +1,15 @@
 import { useEffect, useRef, useState } from "react";
 import type { LocalRow } from "@academic-os/core";
-import { FileText, NotebookText, ListTodo, CalendarDays, Undo2 } from "lucide-react";
+import { FileText, NotebookText, ListTodo, CalendarDays, Undo2, Home, BookOpen, Briefcase } from "lucide-react";
 import { AuthGate } from "./components/AuthGate";
 import { TreeSidebar } from "./components/TreeSidebar";
 import { PageEditor } from "./components/PageEditor";
 import { AttachmentsRail } from "./components/AttachmentsRail";
 import { TaskList } from "./components/TaskList";
 import { TimetableView } from "./components/TimetableView";
+import { HomeView } from "./components/HomeView";
+import { SubjectsView } from "./components/SubjectsView";
+import { ProjectsView } from "./components/ProjectsView";
 import { SqliteLocalDb } from "./lib/sqlite-local-db";
 import { createSyncController } from "./lib/sync-loop";
 import { createGTasksSyncController } from "./lib/gtasks-sync-loop";
@@ -14,12 +17,12 @@ import { createGCalSyncController } from "./lib/gcal-sync-loop";
 import { enable as enableAutostart, isEnabled as isAutostartEnabled } from "@tauri-apps/plugin-autostart";
 import "./App.css";
 
-type View = "notes" | "tasks" | "timetable";
+type View = "home" | "notes" | "tasks" | "subjects" | "projects" | "timetable";
 
 function MainLayout({ userId }: { userId: string }) {
   const [localDb, setLocalDb] = useState<SqliteLocalDb | null>(null);
   const [selected, setSelected] = useState<LocalRow | null>(null);
-  const [view, setView] = useState<View>("notes");
+  const [view, setView] = useState<View>("home");
   const [refreshTick, setRefreshTick] = useState(0);
   const [toast, setToast] = useState<{ message: string; undo: () => void } | null>(null);
   const startedRef = useRef(false);
@@ -98,8 +101,11 @@ function MainLayout({ userId }: { userId: string }) {
     <div className="app-layout">
       <nav className="nav-rail">
         {([
+          { id: "home", label: "Home", Icon: Home },
           { id: "notes", label: "Notes", Icon: NotebookText },
           { id: "tasks", label: "Tasks", Icon: ListTodo },
+          { id: "subjects", label: "Subjects", Icon: BookOpen },
+          { id: "projects", label: "Projects", Icon: Briefcase },
           { id: "timetable", label: "Timetable", Icon: CalendarDays },
         ] as const).map(({ id, label, Icon }) => (
           <button
@@ -114,7 +120,21 @@ function MainLayout({ userId }: { userId: string }) {
           </button>
         ))}
       </nav>
-      {view === "notes" ? (
+      {view === "home" ? (
+        <main className="app-main app-main--home">
+          <HomeView
+            localDb={localDb}
+            userId={userId}
+            onChanged={triggerSync}
+            onOpenNote={(node) => {
+              setSelected(node);
+              setView("notes");
+            }}
+            onGoToView={setView}
+            refreshSignal={refreshTick}
+          />
+        </main>
+      ) : view === "notes" ? (
         <>
           <TreeSidebar
             localDb={localDb}
@@ -161,6 +181,14 @@ function MainLayout({ userId }: { userId: string }) {
             onNotify={notify}
             refreshSignal={refreshTick}
           />
+        </main>
+      ) : view === "subjects" ? (
+        <main className="app-main app-main--subjects">
+          <SubjectsView localDb={localDb} userId={userId} onChanged={triggerSync} />
+        </main>
+      ) : view === "projects" ? (
+        <main className="app-main app-main--projects">
+          <ProjectsView localDb={localDb} userId={userId} onChanged={triggerSync} onNotify={notify} />
         </main>
       ) : (
         <main className="app-main app-main--timetable">
