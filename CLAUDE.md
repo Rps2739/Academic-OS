@@ -2,7 +2,9 @@
 
 A personal academic management desktop app for an MBA student at SIBM Bengaluru (Batch 2025-27). Tauri v2 + React frontend, Supabase/Postgres backend, local-first with a SQLite mirror. Built phase-by-phase against a design manual the user supplied in an earlier conversation (not stored in this repo — its phase numbers show up in code comments like "design manual §4.3"; if a comment references a section you can't find, ask the user rather than guessing its contents).
 
-**Read `memory/project_phase_status.md` and `memory/project_next_audit_task.md` before starting any work in this repo** — the second one describes exactly what the user is about to ask you to do next (a full bug/logic audit + UI/UX pass), including what's already known-uncertain so it isn't re-discovered from scratch.
+**Read `memory/project_phase_status.md` and `memory/project_next_audit_task.md` before starting any work in this repo** — the second one has the full audit-pass history and a list of items that still need the user's own eyes to confirm, so it isn't re-discovered from scratch.
+
+**A `LEARNING.md` file exists at the repo root** — a from-scratch study guide (architecture, features, "why is X built this way", interview-prep Q&A) written for the user, who vibe-coded this app and wants to actually understand it. Deliberately NOT committed to git the first time it was written (personal study material, not app documentation) — check whether it's tracked before assuming its status, and keep it updated if a later session makes an architectural change worth explaining there too.
 
 ## Stack
 
@@ -16,7 +18,7 @@ A personal academic management desktop app for an MBA student at SIBM Bengaluru 
 
 ```
 apps/desktop/src-tauri/   Rust: window/tray/shortcut setup, local SQLite migrations (lib.rs)
-apps/desktop/src/         React app: components/ (main window), widgets/ (desktop widget windows), lib/ (supabase client, sync loops, local db wrapper)
+apps/desktop/src/         React app: components/ (main window — Home, Notes/TreeSidebar+PageEditor, Tasks, Subjects, Projects, Timetable), widgets/ (desktop widget windows), lib/ (supabase client, sync loops, local db wrapper)
 packages/core/src/
   schema/                 Zod schemas per table (source of truth for shape/validation)
   sync/                   sync engine + local SQLite schema declarations
@@ -53,7 +55,8 @@ scripts/                  one-off scripts the user runs themselves — OAuth ref
 
 ## Running things
 
-- `pnpm --filter desktop tauri dev` — full app (Rust + Vite), from repo root. Vite is pinned to port 1420 (Tauri expects it fixed). A Desktop shortcut ("Academic OS.lnk", using `scripts/launch-app.bat`) launches this the same way.
+- `pnpm --filter desktop tauri dev` — full app (Rust + Vite) **in dev mode**, from repo root, for active development (hot reload). Vite is pinned to port 1420 (Tauri expects it fixed).
+- **The user's Desktop shortcut ("Academic OS.lnk") points at a compiled release binary** (`apps/desktop/src-tauri/target/release/desktop.exe`), NOT the dev command — dev-mode startup (Vite + a `cargo run` check every launch) was noticeably slow, a real complaint. After any change that should reach daily use, rebuild it: `pnpm --filter desktop build && cd apps/desktop/src-tauri && cargo build --release` (or `pnpm --filter desktop tauri build --no-bundle`, equivalent, skips creating an installer). The release binary is a frozen snapshot — it does NOT hot-reload, and won't reflect any change until rebuilt. `scripts/launch-app.bat` still exists and still runs the dev command; it's no longer what the Desktop shortcut uses, but is still handy for a quick manual dev-mode launch.
 - `cd apps/desktop && npx tsc --noEmit` / `cd packages/core && npx tsc --noEmit` — typecheck (no top-level `pnpm typecheck` shortcut has been verified to work across both in this session; check each package directly).
 - `cd packages/core && npx vitest run` — the only test suite currently in the repo (sync engine + timetable parser). Parser tests against real fixtures skip automatically if `samples/` isn't present.
 - `cargo` is not on PATH in a plain shell on this machine — it's at `%USERPROFILE%\.cargo\bin`. In PowerShell: `$env:PATH = "$env:USERPROFILE\.cargo\bin;$env:PATH"` before any `cargo`/`tauri dev` invocation from a background shell.
@@ -70,3 +73,11 @@ scripts/                  one-off scripts the user runs themselves — OAuth ref
 - **Phase 4.6–4.8** (Google Calendar sync) — done, confirmed working end-to-end (every scheduled session has a synced Calendar event; revisions correctly remove the old event and create a new one). See `memory/project_ingest_pipeline.md`.
 - **Desktop widgets pinned below other windows** (2026-09-04) — `alwaysOnBottom` replacing `alwaysOnTop` in `tauri.conf.json`. Compiles clean, but **the actual on-screen z-order behavior still hasn't been visually confirmed** — verify before treating as done.
 - **Full audit + UI/UX pass** (2026-09-05, Opus) — first pass done. Fixed several real bugs (editor data-loss on page switch, folder-delete orphaning descendants, task due-today overdue logic, gtasks-sync mass-delete on a transient list-fetch error, sync-controller leaks) and UX gaps (search now matches titles, tasks list refreshes on sync, nav rail got labels + active indicator, editor Saving/Saved indicator). Full record and the "needs the user's eyes" list in `memory/project_next_audit_task.md`. A deeper *visual* redesign was intentionally deferred to a session where the user can see each screen (the existing OKLCH system is already strong; a blind restyle risks regressing it).
+- **Round 2 of user-reported issues** (2026-09-05, same audit session) — all resolved:
+  - Main window's [X] destroyed it with nothing able to recreate it (tray "Open"/single-instance focus both silently no-op'd) — fixed with a close-request handler that hides instead.
+  - New "Dock widgets right" one-click action (tray + widget right-click menu) — positions both widgets flush right, stacked; persists via `tauri-plugin-window-state` after that.
+  - **App startup was slow** because the Desktop shortcut ran the DEV command (Vite + a cargo check every launch). Switched to a compiled release binary — see "Running things" above. Measured: dev-mode launch was 15-70s depending on whether Rust changed; the release exe reaches a visible window in ~2.3s (measured via `Start-Process` + polling `MainWindowHandle`, not a screenshot).
+  - Delete (notes/folders/tasks/attachments) now shows an "Undo" toast instead of a `confirm()` dialog — deletes immediately (still just a soft-delete under the hood), a few seconds to reverse it, no modal interrupting every delete.
+  - Timetable view now defaults to (and lists first) Browse archive instead of Upload.
+  - Built four new features to fill genuinely empty schema: **Home** (dashboard: today's classes w/ quick attendance marking, tasks due this week, recently-edited notes), **Subjects** (list + "Sync from timetable" one-click backfill + per-subject attendance with a computed %), **Projects** (case comps/group projects — deadline, stage, team; deliberately separate from Tasks). `subjects`/`projects`/`attendance_marks` had existed in the schema/sync layer since early on with zero UI before this.
+- **Automation confirmed working end-to-end** (2026-09-05, re-verified while answering the user directly): both new-week timetable emails and mid-week revised-timetable replies correctly reach Calendar with no manual step.
