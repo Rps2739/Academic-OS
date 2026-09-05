@@ -725,12 +725,54 @@ input {
   font-size: var(--text-sm);
 }
 
+.page-editor__head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-3);
+  margin-bottom: var(--space-4);
+}
+
 .page-editor__title {
-  margin: 0 0 var(--space-4);
+  margin: 0;
   font-size: var(--text-2xl);
   font-weight: 650;
   letter-spacing: -0.02em;
   text-wrap: balance;
+}
+
+.page-editor__status {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+  font-size: var(--text-xs);
+  color: var(--muted);
+  transition: opacity var(--duration-base) var(--ease-out);
+}
+
+.page-editor__status--idle {
+  opacity: 0;
+}
+
+.page-editor__status--saved {
+  color: var(--success);
+}
+
+/* The "Saved" confirmation lingers briefly then fades, so it reads as a
+   moment of feedback rather than permanent chrome. */
+.page-editor__status--saved {
+  animation: page-editor-saved-fade 2.4s var(--ease-out) forwards;
+}
+
+@keyframes page-editor-saved-fade {
+  0%,
+  60% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+  }
 }
 
 /* Blend BlockNote's chrome into our palette rather than letting its
@@ -1151,7 +1193,8 @@ input {
 }
 
 /* ============================================================
-   Desktop widget panels (always-on-top, frameless, transparent)
+   Desktop widget panels (frameless, transparent; the two docked
+   panels sit below other windows, quick-capture stays on top)
    ============================================================ */
 body.widget-window {
   background: transparent;

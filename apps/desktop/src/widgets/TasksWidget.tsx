@@ -14,7 +14,7 @@ function formatDue(iso: string): string {
   return d.toLocaleDateString([], { month: "short", day: "numeric" });
 }
 
-/** Always-on-top desktop panel (design manual §2.2) — full task CRUD, not just a readout. */
+/** Desktop widget panel (design manual §2.2), pinned below other windows — full task CRUD, not just a readout. */
 export function TasksWidget() {
   const { userId, localDb, loading } = useWidgetData();
   const [tasks, setTasks] = useState<LocalRow[]>([]);

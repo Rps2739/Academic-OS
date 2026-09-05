@@ -38,7 +38,7 @@ interface AttachmentsRailProps {
  * Attachments on a node — folder or page, per design manual §1.6. Files
  * never touch the client directly: uploads/downloads go through the
  * drive-upload / drive-fetch Edge Functions, which hold the only Google
- * credentials that exist anywhere (supabase/functions/_shared/google-drive.ts).
+ * credentials that exist anywhere (supabase/functions/_shared/google-oauth.ts).
  * The DB only ever stores the returned Drive file id.
  */
 export function AttachmentsRail({ localDb, userId, node, onChanged }: AttachmentsRailProps) {

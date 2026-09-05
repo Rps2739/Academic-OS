@@ -28,21 +28,27 @@ function MainLayout({ userId }: { userId: string }) {
     if (startedRef.current) return;
     startedRef.current = true;
 
+    // Each controller's start() returns its own teardown; collect them so
+    // the effect cleanup can stop every interval and focus listener rather
+    // than leaking them (harmless while the app is single-lifetime, but
+    // correct, and it stops duplicate loops under React StrictMode/HMR).
+    const stops: Array<() => void> = [];
+
     void SqliteLocalDb.open().then(async (db) => {
       setLocalDb(db);
       const deviceId = await db.getOrCreateDeviceId();
       const controller = createSyncController(db, deviceId);
       syncRef.current = controller;
-      controller.start();
+      stops.push(controller.start());
 
       // Google Tasks sync writes straight to Postgres; this just makes
       // sure the local mirror picks it up promptly instead of waiting
       // for the main sync loop's own next interval.
       const gtasks = createGTasksSyncController(() => controller.triggerSync());
-      gtasks.start();
+      stops.push(gtasks.start());
 
       const gcal = createGCalSyncController(() => controller.triggerSync());
-      gcal.start();
+      stops.push(gcal.start());
     });
 
     // The app is meant to always be running (it's what keeps the desktop
@@ -51,6 +57,10 @@ function MainLayout({ userId }: { userId: string }) {
     void isAutostartEnabled().then((already) => {
       if (!already) void enableAutostart();
     });
+
+    return () => {
+      for (const stop of stops) stop();
+    };
   }, []);
 
   function triggerSync() {
@@ -99,6 +109,9 @@ function MainLayout({ userId }: { userId: string }) {
             selectedId={selected?.id ?? null}
             onSelect={setSelected}
             onChanged={triggerSync}
+            onNodesDeleted={(ids) => {
+              if (selected && ids.includes(selected.id as string)) setSelected(null);
+            }}
             refreshSignal={refreshTick}
           />
           <main className="app-main">
@@ -121,7 +134,7 @@ function MainLayout({ userId }: { userId: string }) {
         </>
       ) : view === "tasks" ? (
         <main className="app-main app-main--tasks">
-          <TaskList localDb={localDb} userId={userId} onChanged={triggerSync} />
+          <TaskList localDb={localDb} userId={userId} onChanged={triggerSync} refreshSignal={refreshTick} />
         </main>
       ) : (
         <main className="app-main app-main--timetable">

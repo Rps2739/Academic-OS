@@ -5,6 +5,7 @@ import type { Block } from "@blocknote/core";
 import "@blocknote/core/fonts/inter.css";
 import "@blocknote/mantine/style.css";
 import { useEffect, useRef, useState } from "react";
+import { Check } from "lucide-react";
 import type { LocalRow } from "@academic-os/core";
 import type { SqliteLocalDb } from "../lib/sqlite-local-db";
 import { sanitizeTablePasteHtml } from "../lib/sanitize-table-paste";
@@ -109,20 +110,34 @@ function PageEditorInner({
     [node.id]
   );
   const saveTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  const dirtyRef = useRef(false);
+  const [saveState, setSaveState] = useState<"idle" | "saving" | "saved">("idle");
 
   useEffect(() => {
     const unsubscribe = editor.onChange(() => {
+      dirtyRef.current = true;
       if (saveTimer.current) clearTimeout(saveTimer.current);
       saveTimer.current = setTimeout(() => void save(), SAVE_DEBOUNCE_MS);
     });
     return () => {
       unsubscribe?.();
       if (saveTimer.current) clearTimeout(saveTimer.current);
+      // Flush any edit still inside the debounce window before this
+      // editor instance is torn down (switching pages recreates it via
+      // the [node.id] dep). Without this, the last <800ms of typing was
+      // silently lost whenever the user clicked away quickly — the
+      // SQLite write still completes after unmount since it's not tied
+      // to React's lifecycle. Guarded by dirtyRef so an untouched page
+      // doesn't rewrite itself (which would bump updated_at and mark the
+      // row dirty for no reason on every page visit).
+      if (dirtyRef.current) void save();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [editor]);
 
   async function save() {
+    dirtyRef.current = false;
+    setSaveState("saving");
     const blocks = editor.document;
     const markdown = await editor.blocksToMarkdownLossy(blocks);
     // A rough plaintext derivation for full-text search (task 1.8) —
@@ -136,11 +151,25 @@ function PageEditorInner({
       plaintext,
     });
     onSaved();
+    setSaveState("saved");
   }
 
   return (
     <div className="page-editor">
-      <h2 className="page-editor__title">{node["title"] as string}</h2>
+      <div className="page-editor__head">
+        <h2 className="page-editor__title">{node["title"] as string}</h2>
+        <span className={`page-editor__status page-editor__status--${saveState}`} aria-live="polite">
+          {saveState === "saving" ? (
+            <>
+              <span className="spinner" aria-hidden /> Saving…
+            </>
+          ) : saveState === "saved" ? (
+            <>
+              <Check size={12} strokeWidth={2.5} /> Saved
+            </>
+          ) : null}
+        </span>
+      </div>
       <BlockNoteView editor={editor} theme={editorTheme} />
     </div>
   );

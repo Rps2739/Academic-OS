@@ -7,6 +7,7 @@ interface TaskListProps {
   localDb: SqliteLocalDb;
   userId: string;
   onChanged: () => void;
+  refreshSignal: number; // bumped after a sync round — refetch so remotely-pulled task changes appear live
 }
 
 type Filter = "open" | "done" | "all";
@@ -22,9 +23,14 @@ function toDateInputValue(iso: string | null): string {
   return new Date(d.getTime() - offset * 60_000).toISOString().slice(0, 10);
 }
 
+/** A task is overdue only once its due *date* is strictly in the past —
+ * compared by calendar day, not raw instant. Due dates are date-only
+ * (stored at UTC midnight), so an instant comparison wrongly flagged a
+ * task due *today* as overdue the moment local time passed that stored
+ * midnight. */
 function isOverdue(dueAt: string | null, status: string): boolean {
   if (!dueAt || status !== "open") return false;
-  return new Date(dueAt).getTime() < Date.now();
+  return toDateInputValue(dueAt) < toDateInputValue(new Date().toISOString());
 }
 
 /**
@@ -34,7 +40,7 @@ function isOverdue(dueAt: string | null, status: string): boolean {
  * system — "SIBM" or "Personal" is just a folder, same as it is for
  * notes, so grouping tasks under it needs no new table or migration.
  */
-export function TaskList({ localDb, userId, onChanged }: TaskListProps) {
+export function TaskList({ localDb, userId, onChanged, refreshSignal }: TaskListProps) {
   const [tasks, setTasks] = useState<LocalRow[]>([]);
   const [categories, setCategories] = useState<LocalRow[]>([]);
   const [filter, setFilter] = useState<Filter>("open");
@@ -58,10 +64,17 @@ export function TaskList({ localDb, userId, onChanged }: TaskListProps) {
   }
 
   useEffect(() => {
+    // A sync round can land while the user is mid-edit in an inline task
+    // field; refetching then would replace `tasks` and wipe the
+    // uncommitted keystrokes. Skip the refetch in that case (it'll run
+    // on the next signal, once they've clicked away). On mount nothing
+    // is focused, so the initial load always runs.
+    const active = document.activeElement;
+    if (active && active.closest(".task-list__items")) return;
     void refresh();
     void refreshCategories();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [refreshSignal]);
 
   async function addTask() {
     const title = draft.trim();

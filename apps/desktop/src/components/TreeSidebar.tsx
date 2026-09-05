@@ -10,6 +10,7 @@ interface TreeSidebarProps {
   selectedId: string | null;
   onSelect: (node: LocalRow) => void;
   onChanged: () => void; // called after any mutation, so callers can trigger a sync
+  onNodesDeleted: (ids: string[]) => void; // so the parent can clear a now-deleted selection
   refreshSignal: number; // bumped by the parent after a remote pull lands — refetch, don't remount
 }
 
@@ -19,7 +20,7 @@ function parentKey(parentId: string | null): string {
   return parentId ?? ROOT_KEY;
 }
 
-export function TreeSidebar({ localDb, userId, selectedId, onSelect, onChanged, refreshSignal }: TreeSidebarProps) {
+export function TreeSidebar({ localDb, userId, selectedId, onSelect, onChanged, onNodesDeleted, refreshSignal }: TreeSidebarProps) {
   const [childrenByParent, setChildrenByParent] = useState<Record<string, LocalRow[]>>({});
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const expandedRef = useRef(expanded);
@@ -81,8 +82,37 @@ export function TreeSidebar({ localDb, userId, selectedId, onSelect, onChanged, 
   }
 
   async function deleteNode(node: LocalRow) {
-    await localDb.put("nodes", { id: node.id, user_id: userId, deleted_at: new Date().toISOString() });
+    // Gather the node and every descendant folder/page in one shot, so
+    // deleting a folder cascades to its whole subtree. Without this, a
+    // folder's children kept deleted_at = NULL and became orphans:
+    // invisible in the tree (their parent no longer renders) yet still
+    // returned by search, still synced to Postgres, their page bodies
+    // never cleaned up.
+    const descendants = await localDb.raw.select<{ id: string; kind: string }[]>(
+      `WITH RECURSIVE subtree(id) AS (
+         SELECT id FROM nodes WHERE id = $1
+         UNION ALL
+         SELECT n.id FROM nodes n JOIN subtree s ON n.parent_id = s.id
+       )
+       SELECT n.id, n.kind FROM nodes n JOIN subtree s ON n.id = s.id WHERE n.deleted_at IS NULL`,
+      [node.id]
+    );
+
+    const childCount = descendants.length - 1; // excludes the node itself
+    if (node["kind"] === "folder" && childCount > 0) {
+      const ok = window.confirm(
+        `Delete "${node["title"] as string}" and its ${childCount} item${childCount === 1 ? "" : "s"}? This can't be undone from here.`
+      );
+      if (!ok) return;
+    }
+
+    const now = new Date().toISOString();
+    const ids = descendants.map((d) => d.id);
+    for (const id of ids) {
+      await localDb.put("nodes", { id, user_id: userId, deleted_at: now });
+    }
     await loadChildren((node["parent_id"] as string | null) ?? null);
+    onNodesDeleted(ids);
     onChanged();
   }
 
