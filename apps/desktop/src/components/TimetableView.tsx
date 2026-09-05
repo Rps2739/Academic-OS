@@ -10,23 +10,27 @@ interface TimetableViewProps {
 }
 
 export function TimetableView({ localDb, userId, onChanged }: TimetableViewProps) {
-  const [tab, setTab] = useState<"upload" | "archive">("upload");
+  // Archive is what you actually check day-to-day ("what classes do I
+  // have this week") — Upload is an occasional action. Defaulting to
+  // Upload made the thing people look at most feel buried; archive is
+  // now both the default tab and listed first.
+  const [tab, setTab] = useState<"upload" | "archive">("archive");
   const [archiveKey, setArchiveKey] = useState(0);
 
   return (
     <div className={`timetable-view ${tab === "archive" ? "timetable-view--archive" : ""}`}>
       <div className="timetable-view__tabs">
         <button
-          className={`timetable-view__tab ${tab === "upload" ? "timetable-view__tab--active" : ""}`}
-          onClick={() => setTab("upload")}
-        >
-          Upload
-        </button>
-        <button
           className={`timetable-view__tab ${tab === "archive" ? "timetable-view__tab--active" : ""}`}
           onClick={() => setTab("archive")}
         >
           Browse archive
+        </button>
+        <button
+          className={`timetable-view__tab ${tab === "upload" ? "timetable-view__tab--active" : ""}`}
+          onClick={() => setTab("upload")}
+        >
+          Upload
         </button>
       </div>
       {tab === "upload" ? (

@@ -2,7 +2,7 @@ use std::io::{Read, Write};
 use std::net::TcpListener;
 use tauri::menu::{Menu, MenuItem};
 use tauri::tray::TrayIconBuilder;
-use tauri::{Emitter, Manager, WebviewUrl, WebviewWindowBuilder};
+use tauri::{Emitter, Manager, PhysicalPosition, Position, WebviewUrl, WebviewWindowBuilder, WindowEvent};
 use tauri_plugin_global_shortcut::ShortcutState;
 use tauri_plugin_sql::{Migration, MigrationKind};
 
@@ -211,6 +211,36 @@ fn toggle_widgets(app: tauri::AppHandle) {
     toggle_widget_panels(&app);
 }
 
+/// Positions both widget panels flush against the right edge of their
+/// current monitor, stacked top-to-bottom — a one-click "put these
+/// somewhere out of the way and keep them there" action. Works in
+/// physical pixels throughout (both the monitor size and each window's
+/// own outer_size come back physical from these APIs), so no DPI/scale-
+/// factor conversion is needed. Once moved this way,
+/// tauri-plugin-window-state persists the new position across restarts
+/// automatically — this only ever needs to be triggered once per
+/// monitor setup, not every launch.
+fn dock_widgets_right(app: &tauri::AppHandle) {
+    const MARGIN: i32 = 20;
+    const GAP: i32 = 14;
+    let mut next_y = MARGIN;
+    for label in ["widget-tasks", "widget-classes"] {
+        let Some(window) = app.get_webview_window(label) else { continue };
+        let Ok(Some(monitor)) = window.current_monitor() else { continue };
+        let Ok(size) = window.outer_size() else { continue };
+        let screen = monitor.size();
+        let x = screen.width as i32 - size.width as i32 - MARGIN;
+        let _ = window.set_position(Position::Physical(PhysicalPosition { x, y: next_y }));
+        let _ = window.show();
+        next_y += size.height as i32 + GAP;
+    }
+}
+
+#[tauri::command]
+fn dock_widgets(app: tauri::AppHandle) {
+    dock_widgets_right(&app);
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -246,15 +276,34 @@ pub fn run() {
                 })
                 .build(),
         )
-        .invoke_handler(tauri::generate_handler![start_oauth_server, toggle_widgets])
+        .invoke_handler(tauri::generate_handler![start_oauth_server, toggle_widgets, dock_widgets])
         .setup(|app| {
+            // The main window's [X] button used to fully destroy it (Tauri's
+            // default) with nothing else registered to recreate it — once
+            // destroyed, the tray's "Open" and the single-instance focus
+            // handler both call get_webview_window("main"), find nothing,
+            // and silently do nothing. Hiding instead of closing keeps the
+            // window (and the React tree inside it — including the sync
+            // loops that keep the widgets' data fresh) alive in the
+            // background, exactly like a normal "close to tray" app.
+            if let Some(main_window) = app.get_webview_window("main") {
+                let hide_target = main_window.clone();
+                main_window.on_window_event(move |event| {
+                    if let WindowEvent::CloseRequested { api, .. } = event {
+                        api.prevent_close();
+                        let _ = hide_target.hide();
+                    }
+                });
+            }
+
             // Tray icon — v2 API is TrayIconBuilder, not v1's SystemTray.
             let open_i = MenuItem::with_id(app, "open", "Open", true, None::<&str>)?;
             let capture_i =
                 MenuItem::with_id(app, "capture", "Quick capture", true, Some("Ctrl+Alt+N"))?;
             let toggle_i = MenuItem::with_id(app, "toggle", "Toggle panels", true, None::<&str>)?;
+            let dock_i = MenuItem::with_id(app, "dock", "Dock widgets right", true, None::<&str>)?;
             let quit_i = MenuItem::with_id(app, "quit", "Quit", true, None::<&str>)?;
-            let menu = Menu::with_items(app, &[&open_i, &capture_i, &toggle_i, &quit_i])?;
+            let menu = Menu::with_items(app, &[&open_i, &capture_i, &toggle_i, &dock_i, &quit_i])?;
 
             TrayIconBuilder::new()
                 .icon(app.default_window_icon().unwrap().clone())
@@ -269,6 +318,7 @@ pub fn run() {
                     }
                     "capture" => open_quick_capture(app),
                     "toggle" => toggle_widget_panels(app),
+                    "dock" => dock_widgets_right(app),
                     "quit" => app.exit(0),
                     _ => {}
                 })

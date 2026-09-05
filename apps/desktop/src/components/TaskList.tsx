@@ -7,6 +7,7 @@ interface TaskListProps {
   localDb: SqliteLocalDb;
   userId: string;
   onChanged: () => void;
+  onNotify: (message: string, undo: () => void) => void;
   refreshSignal: number; // bumped after a sync round — refetch so remotely-pulled task changes appear live
 }
 
@@ -40,7 +41,7 @@ function isOverdue(dueAt: string | null, status: string): boolean {
  * system — "SIBM" or "Personal" is just a folder, same as it is for
  * notes, so grouping tasks under it needs no new table or migration.
  */
-export function TaskList({ localDb, userId, onChanged, refreshSignal }: TaskListProps) {
+export function TaskList({ localDb, userId, onChanged, onNotify, refreshSignal }: TaskListProps) {
   const [tasks, setTasks] = useState<LocalRow[]>([]);
   const [categories, setCategories] = useState<LocalRow[]>([]);
   const [filter, setFilter] = useState<Filter>("open");
@@ -123,6 +124,13 @@ export function TaskList({ localDb, userId, onChanged, refreshSignal }: TaskList
       user_id: userId,
       deleted_at: new Date().toISOString(),
     });
+    await refresh();
+    onChanged();
+    onNotify(`Deleted "${task["title"] as string}"`, () => void undoDeleteTask(task.id as string));
+  }
+
+  async function undoDeleteTask(id: string) {
+    await localDb.put("tasks", { id, user_id: userId, deleted_at: null });
     await refresh();
     onChanged();
   }

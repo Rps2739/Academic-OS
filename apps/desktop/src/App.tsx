@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import type { LocalRow } from "@academic-os/core";
-import { FileText, NotebookText, ListTodo, CalendarDays } from "lucide-react";
+import { FileText, NotebookText, ListTodo, CalendarDays, Undo2 } from "lucide-react";
 import { AuthGate } from "./components/AuthGate";
 import { TreeSidebar } from "./components/TreeSidebar";
 import { PageEditor } from "./components/PageEditor";
@@ -21,8 +21,26 @@ function MainLayout({ userId }: { userId: string }) {
   const [selected, setSelected] = useState<LocalRow | null>(null);
   const [view, setView] = useState<View>("notes");
   const [refreshTick, setRefreshTick] = useState(0);
+  const [toast, setToast] = useState<{ message: string; undo: () => void } | null>(null);
   const startedRef = useRef(false);
   const syncRef = useRef<ReturnType<typeof createSyncController> | null>(null);
+  const toastTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+
+  /** A low-friction safety net for deletes: no "are you sure?" dialog
+   * (deliberately — that's the friction the user asked to remove), just
+   * delete immediately (it's already a soft-delete, nothing destroyed)
+   * and offer a few seconds to undo it, the same pattern most editors
+   * and Gmail use. */
+  function notify(message: string, undo: () => void) {
+    if (toastTimer.current) clearTimeout(toastTimer.current);
+    setToast({ message, undo });
+    toastTimer.current = setTimeout(() => setToast(null), 6500);
+  }
+
+  function dismissToast() {
+    if (toastTimer.current) clearTimeout(toastTimer.current);
+    setToast(null);
+  }
 
   useEffect(() => {
     if (startedRef.current) return;
@@ -107,6 +125,7 @@ function MainLayout({ userId }: { userId: string }) {
             onNodesDeleted={(ids) => {
               if (selected && ids.includes(selected.id as string)) setSelected(null);
             }}
+            onNotify={notify}
             refreshSignal={refreshTick}
           />
           <main className="app-main">
@@ -117,7 +136,13 @@ function MainLayout({ userId }: { userId: string }) {
                 ) : (
                   <h2 className="page-editor__title">{selected["title"] as string}</h2>
                 )}
-                <AttachmentsRail localDb={localDb} userId={userId} node={selected} onChanged={triggerSync} />
+                <AttachmentsRail
+                  localDb={localDb}
+                  userId={userId}
+                  node={selected}
+                  onChanged={triggerSync}
+                  onNotify={notify}
+                />
               </>
             ) : (
               <div className="app-main__empty">
@@ -129,12 +154,33 @@ function MainLayout({ userId }: { userId: string }) {
         </>
       ) : view === "tasks" ? (
         <main className="app-main app-main--tasks">
-          <TaskList localDb={localDb} userId={userId} onChanged={triggerSync} refreshSignal={refreshTick} />
+          <TaskList
+            localDb={localDb}
+            userId={userId}
+            onChanged={triggerSync}
+            onNotify={notify}
+            refreshSignal={refreshTick}
+          />
         </main>
       ) : (
         <main className="app-main app-main--timetable">
           <TimetableView localDb={localDb} userId={userId} onChanged={triggerSync} />
         </main>
+      )}
+      {toast && (
+        <div className="undo-toast" role="status">
+          <span className="undo-toast__message">{toast.message}</span>
+          <button
+            className="undo-toast__action"
+            onClick={() => {
+              toast.undo();
+              dismissToast();
+            }}
+          >
+            <Undo2 size={13} strokeWidth={2} />
+            Undo
+          </button>
+        </div>
       )}
     </div>
   );

@@ -1,6 +1,7 @@
 import { useState, type ReactNode } from "react";
 import { X } from "lucide-react";
 import { getCurrentWindow, currentMonitor, LogicalPosition } from "@tauri-apps/api/window";
+import { invoke } from "@tauri-apps/api/core";
 
 const MARGIN = 16;
 
@@ -65,6 +66,16 @@ export function WidgetHeader({ icon, label }: WidgetHeaderProps) {
         <>
           <div className="widget-menu-backdrop" onClick={() => setMenuOpen(false)} />
           <div className="widget-menu">
+            <button
+              className="widget-menu__item widget-menu__item--primary"
+              title="Positions both widgets flush to the right edge, stacked — stays there across restarts"
+              onClick={() => {
+                void invoke("dock_widgets");
+                setMenuOpen(false);
+              }}
+            >
+              Dock both right
+            </button>
             {(["top-left", "top-right", "bottom-left", "bottom-right", "center"] as Corner[]).map((c) => (
               <button
                 key={c}

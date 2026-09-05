@@ -32,6 +32,7 @@ interface AttachmentsRailProps {
   userId: string;
   node: LocalRow;
   onChanged: () => void;
+  onNotify: (message: string, undo: () => void) => void;
 }
 
 /**
@@ -41,7 +42,7 @@ interface AttachmentsRailProps {
  * credentials that exist anywhere (supabase/functions/_shared/google-oauth.ts).
  * The DB only ever stores the returned Drive file id.
  */
-export function AttachmentsRail({ localDb, userId, node, onChanged }: AttachmentsRailProps) {
+export function AttachmentsRail({ localDb, userId, node, onChanged, onNotify }: AttachmentsRailProps) {
   const [attachments, setAttachments] = useState<LocalRow[]>([]);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -173,6 +174,13 @@ export function AttachmentsRail({ localDb, userId, node, onChanged }: Attachment
       user_id: userId,
       deleted_at: new Date().toISOString(),
     });
+    await refresh();
+    onChanged();
+    onNotify(`Removed "${att["filename"] as string}"`, () => void undoDelete(att.id as string));
+  }
+
+  async function undoDelete(id: string) {
+    await localDb.put("attachments", { id, user_id: userId, deleted_at: null });
     await refresh();
     onChanged();
   }
