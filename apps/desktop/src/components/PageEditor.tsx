@@ -129,15 +129,17 @@ function PageEditorInner({
       // SQLite write still completes after unmount since it's not tied
       // to React's lifecycle. Guarded by dirtyRef so an untouched page
       // doesn't rewrite itself (which would bump updated_at and mark the
-      // row dirty for no reason on every page visit).
-      if (dirtyRef.current) void save();
+      // row dirty for no reason on every page visit). Silent so the
+      // page being switched TO doesn't briefly flash this one's
+      // "Saving…/Saved" status.
+      if (dirtyRef.current) void save({ silent: true });
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [editor]);
 
-  async function save() {
+  async function save(opts?: { silent?: boolean }) {
     dirtyRef.current = false;
-    setSaveState("saving");
+    if (!opts?.silent) setSaveState("saving");
     const blocks = editor.document;
     const markdown = await editor.blocksToMarkdownLossy(blocks);
     // A rough plaintext derivation for full-text search (task 1.8) —
@@ -151,7 +153,7 @@ function PageEditorInner({
       plaintext,
     });
     onSaved();
-    setSaveState("saved");
+    if (!opts?.silent) setSaveState("saved");
   }
 
   return (

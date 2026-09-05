@@ -79,27 +79,22 @@ function MainLayout({ userId }: { userId: string }) {
   return (
     <div className="app-layout">
       <nav className="nav-rail">
-        <button
-          className={`nav-rail__item ${view === "notes" ? "nav-rail__item--active" : ""}`}
-          title="Notes"
-          onClick={() => setView("notes")}
-        >
-          <NotebookText size={19} strokeWidth={1.75} />
-        </button>
-        <button
-          className={`nav-rail__item ${view === "tasks" ? "nav-rail__item--active" : ""}`}
-          title="Tasks"
-          onClick={() => setView("tasks")}
-        >
-          <ListTodo size={19} strokeWidth={1.75} />
-        </button>
-        <button
-          className={`nav-rail__item ${view === "timetable" ? "nav-rail__item--active" : ""}`}
-          title="Timetable"
-          onClick={() => setView("timetable")}
-        >
-          <CalendarDays size={19} strokeWidth={1.75} />
-        </button>
+        {([
+          { id: "notes", label: "Notes", Icon: NotebookText },
+          { id: "tasks", label: "Tasks", Icon: ListTodo },
+          { id: "timetable", label: "Timetable", Icon: CalendarDays },
+        ] as const).map(({ id, label, Icon }) => (
+          <button
+            key={id}
+            className={`nav-rail__item ${view === id ? "nav-rail__item--active" : ""}`}
+            title={label}
+            aria-current={view === id ? "page" : undefined}
+            onClick={() => setView(id)}
+          >
+            <Icon size={19} strokeWidth={1.75} />
+            <span className="nav-rail__label">{label}</span>
+          </button>
+        ))}
       </nav>
       {view === "notes" ? (
         <>
