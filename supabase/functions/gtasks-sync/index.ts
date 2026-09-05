@@ -245,12 +245,17 @@ Deno.serve(async (req) => {
     // or moves a task — this map must see those fresh values.
     const localByGoogleId = new Map(localTasks.filter((t) => t.google_task_id).map((t) => [t.google_task_id as string, t]));
     const seenGoogleIds = new Set<string>();
+    // Only lists we actually fetched successfully are trustworthy for the
+    // deletion reconciliation in step 5. A transient fetch failure must
+    // NOT be read as "every task in this list was deleted on Google".
+    const pulledListIds = new Set<string>();
 
     for (const [listId, nodeIdForList] of listsToPull) {
       const listRes = await fetch(`${TASKS_API}/lists/${listId}/tasks?showCompleted=true&showHidden=true&maxResults=100`, {
         headers: gHeaders,
       });
       if (!listRes.ok) continue; // a stale/deleted list on Google's side shouldn't fail the whole sync
+      pulledListIds.add(listId);
       const { items } = (await listRes.json()) as { items?: GTask[] };
       const googleTasks = (items ?? []).filter((g) => !g.deleted && !g.hidden);
 
@@ -295,11 +300,20 @@ Deno.serve(async (req) => {
     }
 
     // 5. A local task previously mapped to a Google task that no longer
-    // exists in any list we checked (deleted from the Google Tasks app)
-    // gets soft-deleted here too — this is what makes it a real two-way
-    // sync rather than push-only.
+    // exists in the list we actually fetched (deleted from the Google
+    // Tasks app) gets soft-deleted here too — this is what makes it a
+    // real two-way sync rather than push-only. Gated on
+    // pulledListIds.has(...) so a transient failure to fetch a list is
+    // never mistaken for "everything in it was deleted" — those tasks
+    // are simply left alone until a sync that reads their list cleanly.
     for (const task of localTasks) {
-      if (task.google_task_id && !task.deleted_at && !seenGoogleIds.has(task.google_task_id)) {
+      if (
+        task.google_task_id &&
+        !task.deleted_at &&
+        task.google_tasklist_id &&
+        pulledListIds.has(task.google_tasklist_id) &&
+        !seenGoogleIds.has(task.google_task_id)
+      ) {
         await supabase.from("tasks").update({ deleted_at: new Date().toISOString() }).eq("id", task.id);
       }
     }
