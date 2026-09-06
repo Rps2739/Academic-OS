@@ -4,7 +4,9 @@ import { FileText, NotebookText, ListTodo, CalendarDays, Undo2, Home, BookOpen, 
 import { AuthGate } from "./components/AuthGate";
 import { TreeSidebar } from "./components/TreeSidebar";
 import { PageEditor } from "./components/PageEditor";
+import { NoteOutline } from "./components/NoteOutline";
 import { AttachmentsRail } from "./components/AttachmentsRail";
+import type { Block } from "@blocknote/core";
 import { TaskList } from "./components/TaskList";
 import { TimetableView } from "./components/TimetableView";
 import { HomeView } from "./components/HomeView";
@@ -23,6 +25,7 @@ function MainLayout({ userId }: { userId: string }) {
   const [localDb, setLocalDb] = useState<SqliteLocalDb | null>(null);
   const [selected, setSelected] = useState<LocalRow | null>(null);
   const [splitSelected, setSplitSelected] = useState<LocalRow | null>(null);
+  const [outlineBlocks, setOutlineBlocks] = useState<Block[]>([]);
   const [focusRequest, setFocusRequest] = useState<{ nodeId: string; nonce: number } | null>(null);
   const [view, setView] = useState<View>("home");
   const [refreshTick, setRefreshTick] = useState(0);
@@ -169,7 +172,17 @@ function MainLayout({ userId }: { userId: string }) {
               {selected ? (
                 <>
                   {selected["kind"] === "page" ? (
-                    <PageEditor localDb={localDb} userId={userId} node={selected} onSaved={triggerSync} />
+                    // Wrap editor + outline rail; rail hides when split view is active (no room)
+                    <div className={splitSelected ? undefined : "page-editor-with-rail"}>
+                      <PageEditor
+                        localDb={localDb}
+                        userId={userId}
+                        node={selected}
+                        onSaved={triggerSync}
+                        onDocumentChange={splitSelected ? undefined : setOutlineBlocks}
+                      />
+                      {!splitSelected && <NoteOutline blocks={outlineBlocks} />}
+                    </div>
                   ) : (
                     <h2 className="page-editor__title">{selected["title"] as string}</h2>
                   )}

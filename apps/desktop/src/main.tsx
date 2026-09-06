@@ -6,6 +6,7 @@ import { TasksWidget } from "./widgets/TasksWidget";
 import { ClassesWidget } from "./widgets/ClassesWidget";
 import { QuickCapture } from "./widgets/QuickCapture";
 import "./App.css";
+import { applyStoredTheme } from "./lib/reading-prefs";
 
 const WIDGET_LABELS = ["widget-tasks", "widget-classes", "quick-capture"];
 
@@ -29,6 +30,10 @@ try {
 // showing behind the panel's own rounded corners.
 if (WIDGET_LABELS.includes(label)) {
   document.body.classList.add("widget-window");
+} else {
+  // Apply the saved theme before first paint on the main window only.
+  // Widget windows stay dark always (user decision) — do not call this for them.
+  applyStoredTheme();
 }
 
 /** Every Tauri window loads the same bundle; the window's label picks which root renders. */

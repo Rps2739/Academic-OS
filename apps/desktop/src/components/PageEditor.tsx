@@ -5,10 +5,11 @@ import type { Block } from "@blocknote/core";
 import "@blocknote/core/fonts/inter.css";
 import "@blocknote/mantine/style.css";
 import { useEffect, useRef, useState } from "react";
-import { Check } from "lucide-react";
+import { Check, ALargeSmall, Type } from "lucide-react";
 import type { LocalRow } from "@academic-os/core";
 import type { SqliteLocalDb } from "../lib/sqlite-local-db";
 import { sanitizeTablePasteHtml } from "../lib/sanitize-table-paste";
+import { readPref, writePref, type ReadingFont } from "../lib/reading-prefs";
 
 /** Matches the editor's chrome (menus, toolbars, selection) to the app's
  * own palette via CSS custom properties, so it doesn't fight BlockNote's
@@ -29,11 +30,13 @@ const editorTheme: Theme = {
   fontFamily: "var(--font-sans)",
 };
 
-interface PageEditorProps {
+export interface PageEditorProps {
   localDb: SqliteLocalDb;
   userId: string;
   node: LocalRow;
   onSaved: () => void;
+  /** Optional callback to receive the live editor document for the outline rail */
+  onDocumentChange?: (blocks: Block[]) => void;
 }
 
 const SAVE_DEBOUNCE_MS = 800;
@@ -73,6 +76,7 @@ function PageEditorInner({
   node,
   onSaved,
   initialBlocks,
+  onDocumentChange,
 }: PageEditorProps & { initialBlocks: Block[] | undefined }) {
   // Recreated whenever the selected page changes.
   const editor = useCreateBlockNote(
@@ -112,6 +116,12 @@ function PageEditorInner({
   const saveTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const dirtyRef = useRef(false);
   const [saveState, setSaveState] = useState<"idle" | "saving" | "saved">("idle");
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [readingFont, setReadingFont] = useState<ReadingFont>(() => readPref("font", "sans" as ReadingFont));
+  const [readingScale, setReadingScale] = useState<number>(() => {
+    const s = parseFloat(readPref("scale", "1"));
+    return isNaN(s) ? 1 : Math.min(2, Math.max(0.8, s));
+  });
   // Local draft of the title so typing in the header is smooth; reseeded
   // whenever a different page is selected. Persisting it writes straight
   // to the node row (same as a sidebar rename) and triggers a sync, which
@@ -120,6 +130,44 @@ function PageEditorInner({
   useEffect(() => {
     setTitleDraft(node["title"] as string);
   }, [node]);
+
+  // Ctrl+scroll / pinch zoom on the reading area (passive:false mandatory —
+  // WebView2 claims native page zoom on ctrl+wheel; we must preventDefault
+  // to intercept it. Windows trackpad pinch also delivers as ctrl+wheel.)
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
+    const onWheel = (e: WheelEvent) => {
+      if (!e.ctrlKey) return;
+      e.preventDefault();
+      setReadingScale((s) => {
+        const next = Math.min(2, Math.max(0.8, parseFloat((s + (e.deltaY < 0 ? 0.1 : -0.1)).toFixed(2))));
+        writePref("scale", String(next));
+        return next;
+      });
+    };
+    el.addEventListener("wheel", onWheel, { passive: false });
+    return () => el.removeEventListener("wheel", onWheel);
+  }, []);
+
+  // Keyboard zoom: Ctrl+= (in), Ctrl+- (out), Ctrl+0 (reset)
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (!e.ctrlKey) return;
+      if (e.key === "=" || e.key === "+") {
+        e.preventDefault();
+        setReadingScale((s) => { const n = Math.min(2, parseFloat((s + 0.1).toFixed(2))); writePref("scale", String(n)); return n; });
+      } else if (e.key === "-") {
+        e.preventDefault();
+        setReadingScale((s) => { const n = Math.max(0.8, parseFloat((s - 0.1).toFixed(2))); writePref("scale", String(n)); return n; });
+      } else if (e.key === "0") {
+        e.preventDefault();
+        setReadingScale(1); writePref("scale", "1");
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
 
   async function saveTitle() {
     const next = titleDraft.trim();
@@ -132,11 +180,18 @@ function PageEditorInner({
     onSaved();
   }
 
+  // Seed the outline with the initial document as soon as the editor is ready
+  useEffect(() => {
+    onDocumentChange?.(editor.document);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [editor]);
+
   useEffect(() => {
     const unsubscribe = editor.onChange(() => {
       dirtyRef.current = true;
       if (saveTimer.current) clearTimeout(saveTimer.current);
       saveTimer.current = setTimeout(() => void save(), SAVE_DEBOUNCE_MS);
+      onDocumentChange?.(editor.document);
     });
     return () => {
       unsubscribe?.();
@@ -175,8 +230,17 @@ function PageEditorInner({
     if (!opts?.silent) setSaveState("saved");
   }
 
+  const serifStack = `Georgia, "Iowan Old Style", Charter, "Times New Roman", serif`;
+
   return (
-    <div className="page-editor">
+    <div
+      className="page-editor"
+      ref={containerRef}
+      style={{
+        "--reading-scale": readingScale,
+        "--reading-font": readingFont === "serif" ? serifStack : "var(--font-sans)",
+      } as React.CSSProperties}
+    >
       <div className="page-editor__head">
         <input
           className="page-editor__title-input"
@@ -195,17 +259,30 @@ function PageEditorInner({
             }
           }}
         />
-        <span className={`page-editor__status page-editor__status--${saveState}`} aria-live="polite">
-          {saveState === "saving" ? (
-            <>
-              <span className="spinner" aria-hidden /> Saving…
-            </>
-          ) : saveState === "saved" ? (
-            <>
-              <Check size={12} strokeWidth={2.5} /> Saved
-            </>
-          ) : null}
-        </span>
+        <div className="page-editor__controls">
+          <button
+            className="btn btn--ghost btn--sm page-editor__font-toggle"
+            title={readingFont === "sans" ? "Switch to serif font" : "Switch to sans-serif font"}
+            onClick={() => {
+              const next: ReadingFont = readingFont === "sans" ? "serif" : "sans";
+              setReadingFont(next);
+              writePref("font", next);
+            }}
+          >
+            {readingFont === "sans" ? <Type size={13} strokeWidth={2} /> : <ALargeSmall size={13} strokeWidth={2} />}
+          </button>
+          <span className={`page-editor__status page-editor__status--${saveState}`} aria-live="polite">
+            {saveState === "saving" ? (
+              <>
+                <span className="spinner" aria-hidden /> Saving…
+              </>
+            ) : saveState === "saved" ? (
+              <>
+                <Check size={12} strokeWidth={2.5} /> Saved
+              </>
+            ) : null}
+          </span>
+        </div>
       </div>
       <BlockNoteView editor={editor} theme={editorTheme} />
     </div>

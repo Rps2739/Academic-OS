@@ -1,9 +1,10 @@
 import { useEffect, useState, type ReactNode } from "react";
 import type { Session } from "@supabase/supabase-js";
-import { GraduationCap, AlertCircle, LayoutPanelTop } from "lucide-react";
+import { GraduationCap, AlertCircle, LayoutPanelTop, Sun, Moon } from "lucide-react";
 import { invoke } from "@tauri-apps/api/core";
 import { supabase } from "../lib/supabase";
 import { initDeepLinkAuthListener, signInWithGoogle, signOut } from "../lib/auth";
+import { readPref, writePref, type ThemeName } from "../lib/reading-prefs";
 
 interface AuthGateProps {
   children: (session: Session) => ReactNode;
@@ -14,6 +15,7 @@ export function AuthGate({ children }: AuthGateProps) {
   const [loading, setLoading] = useState(true);
   const [signingIn, setSigningIn] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [theme, setTheme] = useState<ThemeName>(() => readPref("theme", "dark" as ThemeName));
 
   useEffect(() => {
     let unlisten: (() => void) | undefined;
@@ -87,6 +89,18 @@ export function AuthGate({ children }: AuthGateProps) {
           <span className="topbar__email">{session.user.email}</span>
         </div>
         <div className="topbar__actions">
+          <button
+            className="btn btn--ghost"
+            title={theme === "dark" ? "Switch to light mode" : "Switch to dark mode"}
+            onClick={() => {
+              const next: ThemeName = theme === "dark" ? "light" : "dark";
+              setTheme(next);
+              writePref("theme", next);
+              document.documentElement.setAttribute("data-theme", next);
+            }}
+          >
+            {theme === "dark" ? <Sun size={14} strokeWidth={2} /> : <Moon size={14} strokeWidth={2} />}
+          </button>
           <button
             className="btn btn--ghost"
             title="Show/hide the desktop widget panels"
