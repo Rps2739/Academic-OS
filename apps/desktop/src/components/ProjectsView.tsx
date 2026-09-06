@@ -43,6 +43,7 @@ function isOverdue(deadline: string | null, status: string): boolean {
  */
 export function ProjectsView({ localDb, userId, onChanged, onNotify }: ProjectsViewProps) {
   const [projects, setProjects] = useState<LocalRow[]>([]);
+  const [subjects, setSubjects] = useState<LocalRow[]>([]);
   const [filter, setFilter] = useState<Filter>("active");
   const [adding, setAdding] = useState(false);
   const [draftName, setDraftName] = useState("");
@@ -51,6 +52,7 @@ export function ProjectsView({ localDb, userId, onChanged, onNotify }: ProjectsV
   const [draftDeadline, setDraftDeadline] = useState("");
   const [draftMemberName, setDraftMemberName] = useState("");
   const [draftTeam, setDraftTeam] = useState<TeamMember[]>([]);
+  const [draftSubjectId, setDraftSubjectId] = useState("");
 
   async function refresh() {
     const rows = await localDb.raw.select<Record<string, unknown>[]>(
@@ -59,10 +61,23 @@ export function ProjectsView({ localDb, userId, onChanged, onNotify }: ProjectsV
     setProjects(rows as LocalRow[]);
   }
 
+  async function refreshSubjects() {
+    const rows = await localDb.raw.select<Record<string, unknown>[]>(
+      "SELECT * FROM subjects WHERE deleted_at IS NULL ORDER BY name ASC"
+    );
+    setSubjects(rows as LocalRow[]);
+  }
+
   useEffect(() => {
     void refresh();
+    void refreshSubjects();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  function subjectName(subjectId: string | null): string | null {
+    if (!subjectId) return null;
+    return (subjects.find((s) => s.id === subjectId)?.["name"] as string | undefined) ?? null;
+  }
 
   function addTeamMember() {
     const name = draftMemberName.trim();
@@ -83,12 +98,14 @@ export function ProjectsView({ localDb, userId, onChanged, onNotify }: ProjectsV
       deadline: draftDeadline ? new Date(draftDeadline).toISOString() : null,
       team: draftTeam,
       node_id: null,
+      subject_id: draftSubjectId || null,
       status: "active",
     });
     setDraftName("");
     setDraftStage("");
     setDraftDeadline("");
     setDraftTeam([]);
+    setDraftSubjectId("");
     setAdding(false);
     await refresh();
     onChanged();
@@ -173,6 +190,18 @@ export function ProjectsView({ localDb, userId, onChanged, onNotify }: ProjectsV
               value={draftDeadline}
               onChange={(e) => setDraftDeadline(e.target.value)}
             />
+            <select
+              className="project-add__subject"
+              value={draftSubjectId}
+              onChange={(e) => setDraftSubjectId(e.target.value)}
+            >
+              <option value="">No subject</option>
+              {subjects.map((s) => (
+                <option key={s.id as string} value={s.id as string}>
+                  {s["name"] as string}
+                </option>
+              ))}
+            </select>
           </div>
           <div className="project-add__row">
             <input
@@ -265,6 +294,19 @@ export function ProjectsView({ localDb, userId, onChanged, onNotify }: ProjectsV
                         {team.map((m) => m.name).join(", ")}
                       </span>
                     )}
+                    <select
+                      className="project-card__subject-select"
+                      value={(project["subject_id"] as string | null) ?? ""}
+                      onChange={(e) => void updateProject(project, { subject_id: e.target.value || null })}
+                      title={subjectName(project["subject_id"] as string | null) ?? "Link to a subject"}
+                    >
+                      <option value="">No subject</option>
+                      {subjects.map((s) => (
+                        <option key={s.id as string} value={s.id as string}>
+                          {s["name"] as string}
+                        </option>
+                      ))}
+                    </select>
                   </div>
                 </div>
                 <button className="icon-btn icon-btn--danger" title="Delete" onClick={() => void deleteProject(project)}>

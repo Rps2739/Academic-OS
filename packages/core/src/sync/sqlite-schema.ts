@@ -58,6 +58,7 @@ export const TABLE_COLUMNS: Record<TableName, Record<string, SqliteType>> = {
     deadline: "TEXT",
     team: "TEXT", // JSON array
     node_id: "TEXT",
+    subject_id: "TEXT",
     status: "TEXT",
   },
   nodes: {

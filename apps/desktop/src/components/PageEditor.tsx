@@ -112,6 +112,25 @@ function PageEditorInner({
   const saveTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const dirtyRef = useRef(false);
   const [saveState, setSaveState] = useState<"idle" | "saving" | "saved">("idle");
+  // Local draft of the title so typing in the header is smooth; reseeded
+  // whenever a different page is selected. Persisting it writes straight
+  // to the node row (same as a sidebar rename) and triggers a sync, which
+  // bumps the sidebar's refresh so the tree reflects the new name too.
+  const [titleDraft, setTitleDraft] = useState(node["title"] as string);
+  useEffect(() => {
+    setTitleDraft(node["title"] as string);
+  }, [node]);
+
+  async function saveTitle() {
+    const next = titleDraft.trim();
+    const current = node["title"] as string;
+    if (!next || next === current) {
+      setTitleDraft(current); // discard an empty/blank edit
+      return;
+    }
+    await localDb.put("nodes", { id: node.id as string, user_id: userId, title: next });
+    onSaved();
+  }
 
   useEffect(() => {
     const unsubscribe = editor.onChange(() => {
@@ -159,7 +178,23 @@ function PageEditorInner({
   return (
     <div className="page-editor">
       <div className="page-editor__head">
-        <h2 className="page-editor__title">{node["title"] as string}</h2>
+        <input
+          className="page-editor__title-input"
+          value={titleDraft}
+          placeholder="Untitled"
+          onChange={(e) => setTitleDraft(e.target.value)}
+          onBlur={() => void saveTitle()}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") {
+              e.preventDefault();
+              (e.target as HTMLInputElement).blur();
+            }
+            if (e.key === "Escape") {
+              setTitleDraft(node["title"] as string);
+              (e.target as HTMLInputElement).blur();
+            }
+          }}
+        />
         <span className={`page-editor__status page-editor__status--${saveState}`} aria-live="polite">
           {saveState === "saving" ? (
             <>

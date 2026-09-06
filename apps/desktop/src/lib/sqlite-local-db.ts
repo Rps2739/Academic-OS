@@ -192,6 +192,56 @@ export class SqliteLocalDb implements LocalDb {
     return rows.map((r) => decodeRow("nodes", r));
   }
 
+  /** Root-to-node chain of {id, title}, inclusive of the node itself — used both to
+   * expand a tree path down to a node (Subjects/Projects "open in Notes") and to build
+   * a matching Drive folder path for an attachment's upload. */
+  async getAncestorChain(nodeId: string): Promise<Array<{ id: string; title: string }>> {
+    const rows = await this.db.select<Array<{ id: string; title: string; depth: number }>>(
+      `WITH RECURSIVE chain(id, title, parent_id, depth) AS (
+         SELECT id, title, parent_id, 0 FROM nodes WHERE id = $1
+         UNION ALL
+         SELECT n.id, n.title, n.parent_id, c.depth + 1
+         FROM nodes n JOIN chain c ON n.id = c.parent_id
+       )
+       SELECT id, title, depth FROM chain ORDER BY depth DESC`,
+      [nodeId]
+    );
+    return rows.map((r) => ({ id: r.id, title: r.title }));
+  }
+
+  /** Finds (case-insensitive) or creates a chain of nested folders under the Notes
+   * root, e.g. ["SIBM", "Sem 3", "Business Statistics"], returning the final folder's
+   * node id. Used to give Subjects/Projects a real home in the Notes tree. */
+  async findOrCreateFolderPath(userId: string, segments: string[]): Promise<string> {
+    let parentId: string | null = null;
+    for (const raw of segments) {
+      const segment = raw.trim();
+      if (!segment) continue;
+      const siblings = await this.listChildren(parentId);
+      const existing = siblings.find(
+        (n) => n["kind"] === "folder" && (n["title"] as string).toLowerCase() === segment.toLowerCase()
+      );
+      if (existing) {
+        parentId = existing.id as string;
+        continue;
+      }
+      const maxOrder = siblings.reduce((max, s) => Math.max(max, (s["sort_order"] as number) ?? 0), 0);
+      const id = crypto.randomUUID();
+      await this.put("nodes", {
+        id,
+        user_id: userId,
+        parent_id: parentId,
+        kind: "folder",
+        title: segment,
+        icon: null,
+        sort_order: maxOrder + 1,
+      });
+      parentId = id;
+    }
+    if (parentId === null) throw new Error("findOrCreateFolderPath requires at least one non-empty segment");
+    return parentId;
+  }
+
   /** This device's stable id, created once and persisted in sync_meta. Used to attribute conflict-loser entries in page_versions. */
   async getOrCreateDeviceId(): Promise<string> {
     const existing = await this.getMeta("device_id");

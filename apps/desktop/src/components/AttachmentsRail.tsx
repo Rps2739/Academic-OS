@@ -66,10 +66,18 @@ export function AttachmentsRail({ localDb, userId, node, onChanged, onNotify }: 
     setBusy(true);
     setError(null);
     try {
+      // Mirrors the node's own place in the Notes tree as a Drive folder
+      // path (e.g. SIBM / Sem 3 / Business Statistics), so files uploaded
+      // here land in the matching folder in the user's Drive instead of
+      // a flat pile at the root.
+      const ancestorChain = await localDb.getAncestorChain(node.id);
+      const folderPath = ancestorChain.map((a) => a.title);
+
       for (const file of Array.from(files)) {
         const form = new FormData();
         form.append("file", file);
         form.append("filename", file.name);
+        form.append("folderPath", JSON.stringify(folderPath));
         const { data, error: fnError } = await supabase.functions.invoke("drive-upload", {
           body: form,
         });

@@ -164,6 +164,13 @@ fn migrations() -> Vec<Migration> {
             ALTER TABLE timetable_imports ADD COLUMN drive_file_id TEXT;
             ALTER TABLE timetable_imports ADD COLUMN original_filename TEXT;
         ",
+    }, Migration {
+        version: 3,
+        description: "projects_subject_id",
+        kind: MigrationKind::Up,
+        sql: "
+            ALTER TABLE projects ADD COLUMN subject_id TEXT;
+        ",
     }]
 }
 
@@ -226,12 +233,27 @@ fn dock_widgets_right(app: &tauri::AppHandle) {
     let mut next_y = MARGIN;
     for label in ["widget-tasks", "widget-classes"] {
         let Some(window) = app.get_webview_window(label) else { continue };
-        let Ok(Some(monitor)) = window.current_monitor() else { continue };
+        // Show BEFORE detecting the monitor: current_monitor() returns
+        // None for a window that's currently hidden (or was never shown),
+        // which is exactly why the earlier version silently did nothing
+        // when the panels were toggled off. Fall back to the primary
+        // monitor if the per-window lookup still comes back empty.
+        let _ = window.show();
+        let monitor = window
+            .current_monitor()
+            .ok()
+            .flatten()
+            .or_else(|| app.primary_monitor().ok().flatten());
+        let Some(monitor) = monitor else { continue };
         let Ok(size) = window.outer_size() else { continue };
         let screen = monitor.size();
-        let x = screen.width as i32 - size.width as i32 - MARGIN;
-        let _ = window.set_position(Position::Physical(PhysicalPosition { x, y: next_y }));
-        let _ = window.show();
+        // monitor.position() is the monitor's top-left in the virtual
+        // desktop; add it so the right-edge math is correct on a secondary
+        // monitor whose origin isn't (0,0), not just the primary.
+        let origin = monitor.position();
+        let x = origin.x + screen.width as i32 - size.width as i32 - MARGIN;
+        let y = origin.y + next_y;
+        let _ = window.set_position(Position::Physical(PhysicalPosition { x, y }));
         next_y += size.height as i32 + GAP;
     }
 }
@@ -323,6 +345,16 @@ pub fn run() {
                     _ => {}
                 })
                 .build(app)?;
+
+            // Dock the widget panels to the right edge on every launch, so
+            // "always snapped to the far right, out of the way" is the
+            // default the user asked for rather than something they have to
+            // set up each time. Runs after tauri-plugin-window-state has
+            // restored positions (setup runs after plugin init), so this
+            // deliberately wins over a stale restored position. The panels
+            // are still freely draggable during a session; they just return
+            // to the right on the next start.
+            dock_widgets_right(app.handle());
 
             Ok(())
         })

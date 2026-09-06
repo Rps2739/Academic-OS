@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import type { LocalRow } from "@academic-os/core";
 import type { SqliteLocalDb } from "../lib/sqlite-local-db";
 import { SearchBox } from "./SearchBox";
-import { Folder, FolderPlus, FileText, FilePlus, ChevronRight, Trash2 } from "lucide-react";
+import { Folder, FolderPlus, FileText, FilePlus, ChevronRight, Trash2, Columns2 } from "lucide-react";
 
 interface TreeSidebarProps {
   localDb: SqliteLocalDb;
@@ -13,6 +13,8 @@ interface TreeSidebarProps {
   onNodesDeleted: (ids: string[]) => void; // so the parent can clear a now-deleted selection
   onNotify: (message: string, undo: () => void) => void; // surfaces an "Undo" toast instead of a confirm dialog
   refreshSignal: number; // bumped by the parent after a remote pull lands — refetch, don't remount
+  focusRequest?: { nodeId: string; nonce: number } | null; // expand+reveal a node picked from outside the tree (e.g. Subjects' "Open notes folder")
+  onOpenInSplit?: (node: LocalRow) => void; // opens a node in the second split-view pane instead of replacing the main selection
 }
 
 const ROOT_KEY = "__root__";
@@ -21,7 +23,7 @@ function parentKey(parentId: string | null): string {
   return parentId ?? ROOT_KEY;
 }
 
-export function TreeSidebar({ localDb, userId, selectedId, onSelect, onChanged, onNodesDeleted, onNotify, refreshSignal }: TreeSidebarProps) {
+export function TreeSidebar({ localDb, userId, selectedId, onSelect, onChanged, onNodesDeleted, onNotify, refreshSignal, focusRequest, onOpenInSplit }: TreeSidebarProps) {
   const [childrenByParent, setChildrenByParent] = useState<Record<string, LocalRow[]>>({});
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const expandedRef = useRef(expanded);
@@ -48,6 +50,26 @@ export function TreeSidebar({ localDb, userId, selectedId, onSelect, onChanged, 
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [loadChildren, refreshSignal]);
+
+  // Expands every ancestor folder of a node picked from outside the tree
+  // (Subjects' "Open notes folder") and loads their children, so the node
+  // is actually visible instead of selected-but-buried under collapsed
+  // folders. Keyed on a nonce so re-opening the same folder twice in a
+  // row still re-reveals it even if nothing else changed.
+  useEffect(() => {
+    if (!focusRequest) return;
+    void (async () => {
+      const chain = await localDb.getAncestorChain(focusRequest.nodeId);
+      const ancestorIds = chain.slice(0, -1).map((c) => c.id);
+      setExpanded((prev) => {
+        const next = new Set(prev);
+        for (const id of ancestorIds) next.add(id);
+        return next;
+      });
+      for (const id of ancestorIds) await loadChildren(id);
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [focusRequest]);
 
   async function createNode(parentId: string | null, kind: "folder" | "page") {
     const siblings = childrenByParent[parentKey(parentId)] ?? [];
@@ -168,6 +190,7 @@ export function TreeSidebar({ localDb, userId, selectedId, onSelect, onChanged, 
             isSelected={selectedId === node.id}
             onToggle={() => toggleExpanded(node.id)}
             onSelect={() => onSelect(node)}
+            onOpenSplit={onOpenInSplit ? () => onOpenInSplit(node) : undefined}
             onRename={(title) => void renameNode(node, title)}
             onDelete={() => void deleteNode(node)}
             onCreateChild={(kind) => void createNode(node.id, kind)}
@@ -227,6 +250,7 @@ interface TreeNodeProps {
   isSelected: boolean;
   onToggle: () => void;
   onSelect: () => void;
+  onOpenSplit?: () => void;
   onRename: (title: string) => void;
   onDelete: () => void;
   onCreateChild: (kind: "folder" | "page") => void;
@@ -241,6 +265,7 @@ function TreeNode({
   isSelected,
   onToggle,
   onSelect,
+  onOpenSplit,
   onRename,
   onDelete,
   onCreateChild,
@@ -328,6 +353,11 @@ function TreeNode({
               <FilePlus size={13} strokeWidth={2} />
             </button>
           </span>
+        )}
+        {onOpenSplit && (
+          <button className="icon-btn" title="Open in split view" onClick={onOpenSplit}>
+            <Columns2 size={13} strokeWidth={2} />
+          </button>
         )}
         <button className="icon-btn icon-btn--danger" title="Delete" onClick={onDelete}>
           <Trash2 size={13} strokeWidth={2} />

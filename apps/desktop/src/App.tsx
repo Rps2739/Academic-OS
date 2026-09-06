@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import type { LocalRow } from "@academic-os/core";
-import { FileText, NotebookText, ListTodo, CalendarDays, Undo2, Home, BookOpen, Briefcase } from "lucide-react";
+import { FileText, NotebookText, ListTodo, CalendarDays, Undo2, Home, BookOpen, Briefcase, Columns2, X } from "lucide-react";
 import { AuthGate } from "./components/AuthGate";
 import { TreeSidebar } from "./components/TreeSidebar";
 import { PageEditor } from "./components/PageEditor";
@@ -22,6 +22,8 @@ type View = "home" | "notes" | "tasks" | "subjects" | "projects" | "timetable";
 function MainLayout({ userId }: { userId: string }) {
   const [localDb, setLocalDb] = useState<SqliteLocalDb | null>(null);
   const [selected, setSelected] = useState<LocalRow | null>(null);
+  const [splitSelected, setSplitSelected] = useState<LocalRow | null>(null);
+  const [focusRequest, setFocusRequest] = useState<{ nodeId: string; nonce: number } | null>(null);
   const [view, setView] = useState<View>("home");
   const [refreshTick, setRefreshTick] = useState(0);
   const [toast, setToast] = useState<{ message: string; undo: () => void } | null>(null);
@@ -89,6 +91,17 @@ function MainLayout({ userId }: { userId: string }) {
     setRefreshTick((t) => t + 1);
   }
 
+  /** Jumps to Notes with a given folder selected and its ancestor chain
+   * expanded in the tree — how Subjects' "Open notes folder" surfaces a
+   * subject's linked folder instead of leaving it to be found by hand. */
+  async function openNotesFolder(nodeId: string) {
+    const node = await localDb?.getLocal("nodes", nodeId);
+    if (!node) return;
+    setSelected(node);
+    setFocusRequest({ nodeId, nonce: Date.now() });
+    setView("notes");
+  }
+
   if (!localDb) {
     return (
       <div className="app-loading">
@@ -144,30 +157,58 @@ function MainLayout({ userId }: { userId: string }) {
             onChanged={triggerSync}
             onNodesDeleted={(ids) => {
               if (selected && ids.includes(selected.id as string)) setSelected(null);
+              if (splitSelected && ids.includes(splitSelected.id as string)) setSplitSelected(null);
             }}
             onNotify={notify}
             refreshSignal={refreshTick}
+            focusRequest={focusRequest}
+            onOpenInSplit={setSplitSelected}
           />
-          <main className="app-main">
-            {selected ? (
-              <>
-                {selected["kind"] === "page" ? (
-                  <PageEditor localDb={localDb} userId={userId} node={selected} onSaved={triggerSync} />
+          <main className={`app-main ${splitSelected ? "app-main--split" : ""}`}>
+            <div className="app-pane">
+              {selected ? (
+                <>
+                  {selected["kind"] === "page" ? (
+                    <PageEditor localDb={localDb} userId={userId} node={selected} onSaved={triggerSync} />
+                  ) : (
+                    <h2 className="page-editor__title">{selected["title"] as string}</h2>
+                  )}
+                  <AttachmentsRail
+                    localDb={localDb}
+                    userId={userId}
+                    node={selected}
+                    onChanged={triggerSync}
+                    onNotify={notify}
+                  />
+                </>
+              ) : (
+                <div className="app-main__empty">
+                  <FileText size={28} strokeWidth={1.5} />
+                  <span>Select a page, or create one from the sidebar.</span>
+                </div>
+              )}
+            </div>
+            {splitSelected && (
+              <div className="app-pane app-pane--split">
+                <div className="app-pane__split-header">
+                  <Columns2 size={13} strokeWidth={2} />
+                  <span className="app-pane__split-title">{splitSelected["title"] as string}</span>
+                  <button className="icon-btn" title="Close split pane" onClick={() => setSplitSelected(null)}>
+                    <X size={14} strokeWidth={2} />
+                  </button>
+                </div>
+                {splitSelected["kind"] === "page" ? (
+                  <PageEditor localDb={localDb} userId={userId} node={splitSelected} onSaved={triggerSync} />
                 ) : (
-                  <h2 className="page-editor__title">{selected["title"] as string}</h2>
+                  <h2 className="page-editor__title">{splitSelected["title"] as string}</h2>
                 )}
                 <AttachmentsRail
                   localDb={localDb}
                   userId={userId}
-                  node={selected}
+                  node={splitSelected}
                   onChanged={triggerSync}
                   onNotify={notify}
                 />
-              </>
-            ) : (
-              <div className="app-main__empty">
-                <FileText size={28} strokeWidth={1.5} />
-                <span>Select a page, or create one from the sidebar.</span>
               </div>
             )}
           </main>
@@ -184,7 +225,14 @@ function MainLayout({ userId }: { userId: string }) {
         </main>
       ) : view === "subjects" ? (
         <main className="app-main app-main--subjects">
-          <SubjectsView localDb={localDb} userId={userId} onChanged={triggerSync} />
+          <SubjectsView
+            localDb={localDb}
+            userId={userId}
+            onChanged={triggerSync}
+            onOpenFolder={(nodeId) => void openNotesFolder(nodeId)}
+            onGoToView={setView}
+            onNotify={notify}
+          />
         </main>
       ) : view === "projects" ? (
         <main className="app-main app-main--projects">

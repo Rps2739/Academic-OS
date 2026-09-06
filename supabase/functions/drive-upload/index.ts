@@ -7,7 +7,7 @@
 // Functions verify the JWT before this code runs.
 import { getGoogleAccessToken } from "../_shared/google-oauth.ts";
 import { corsHeaders } from "../_shared/cors.ts";
-import { uploadFileToDrive } from "../_shared/drive.ts";
+import { uploadFileToDrive, resolveFolderPath } from "../_shared/drive.ts";
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
@@ -21,6 +21,7 @@ Deno.serve(async (req) => {
     const form = await req.formData();
     const file = form.get("file");
     const filename = form.get("filename");
+    const folderPathRaw = form.get("folderPath"); // optional JSON array of folder names, e.g. ["SIBM","Sem 3","Business Statistics"]
     if (!(file instanceof File) || typeof filename !== "string" || !filename) {
       return new Response(JSON.stringify({ error: "file and filename are required" }), {
         status: 400,
@@ -29,8 +30,15 @@ Deno.serve(async (req) => {
     }
 
     const accessToken = await getGoogleAccessToken();
+
+    let parentFolderId: string | null = null;
+    if (typeof folderPathRaw === "string" && folderPathRaw) {
+      const segments = JSON.parse(folderPathRaw) as string[];
+      parentFolderId = await resolveFolderPath(accessToken, segments);
+    }
+
     const bytes = new Uint8Array(await file.arrayBuffer());
-    const driveFileId = await uploadFileToDrive(accessToken, filename, file.type, bytes);
+    const driveFileId = await uploadFileToDrive(accessToken, filename, file.type, bytes, parentFolderId);
 
     return new Response(JSON.stringify({ driveFileId }), {
       status: 200,

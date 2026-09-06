@@ -16,6 +16,7 @@ export const projectSchema = syncableBase.extend({
   deadline: z.string().datetime().nullable(),
   team: z.array(teamMemberSchema).default([]),
   node_id: z.string().uuid().nullable(),
+  subject_id: z.string().uuid().nullable(),
   status: projectStatus.default("active"),
 });
 
