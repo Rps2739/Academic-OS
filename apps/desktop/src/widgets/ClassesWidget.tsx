@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { CalendarDays, Plus, Trash2 } from "lucide-react";
+import { CalendarDays, Plus, Trash2, Pencil, X } from "lucide-react";
 import type { LocalRow } from "@academic-os/core";
 import { useWidgetData } from "./useWidgetData";
 import { WidgetHeader } from "./WidgetHeader";
@@ -10,11 +10,38 @@ function formatTime(iso: string): string {
   return new Date(iso).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
 }
 
-function todayIsoAt(hhmm: string): string {
-  const [h, m] = hhmm.split(":").map(Number);
+function todayDateStr(): string {
   const d = new Date();
-  d.setHours(h, m, 0, 0);
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
+
+/** Combines a YYYY-MM-DD date string with an HH:MM time into a local ISO
+ * instant — lets the add/edit form schedule a class for any day (e.g.
+ * tomorrow), not just today, while the widget's own list stays scoped to
+ * "today" per its name/purpose. */
+function dateAtTime(dateStr: string, hhmm: string): string {
+  const [y, mo, da] = dateStr.split("-").map(Number);
+  const [h, m] = hhmm.split(":").map(Number);
+  const d = new Date(y, (mo ?? 1) - 1, da ?? 1, h, m, 0, 0);
   return d.toISOString();
+}
+
+/** YYYY-MM-DD in local time, for pre-filling the date field when editing an
+ * existing session (its starts_at, not necessarily today). */
+function dateStrOf(iso: string): string {
+  const d = new Date(iso);
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
+
+function timeStrOf(iso: string): string {
+  const d = new Date(iso);
+  return `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
 }
 
 function mondayOf(date: Date): string {
@@ -30,14 +57,21 @@ function mondayOf(date: Date): string {
  * pipeline (design manual Phase 4) will populate automatically once
  * built. Until then, this add/edit/delete form lets today's schedule be
  * entered by hand rather than leaving the panel permanently empty.
+ *
+ * The form can schedule a session for any date (not just today) so a class
+ * for tomorrow can be queued in advance — the list below still only shows
+ * today's sessions, matching the widget's own "Today" scope; a
+ * tomorrow-dated entry simply appears here once that day arrives.
  */
 export function ClassesWidget() {
   const { userId, localDb, loading } = useWidgetData();
   const [sessions, setSessions] = useState<LocalRow[]>([]);
-  const [adding, setAdding] = useState(false);
+  const [formOpen, setFormOpen] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
   const [subject, setSubject] = useState("");
   const [time, setTime] = useState("09:00");
   const [room, setRoom] = useState("");
+  const [dateStr, setDateStr] = useState(todayDateStr());
 
   async function refresh() {
     if (!localDb) return;
@@ -57,29 +91,65 @@ export function ClassesWidget() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [localDb]);
 
-  async function addSession() {
-    const label = subject.trim();
-    if (!label || !localDb || !userId) return;
-    const startsAt = todayIsoAt(time);
-    const endsAt = new Date(new Date(startsAt).getTime() + 60 * 60 * 1000).toISOString();
-    await localDb.put("class_sessions", {
-      id: crypto.randomUUID(),
-      user_id: userId,
-      import_id: null, // manually entered, not from the (not-yet-built) timetable pipeline
-      week_start: mondayOf(new Date()),
-      starts_at: startsAt,
-      ends_at: endsAt,
-      subject_id: null,
-      subject_label: label,
-      faculty: null,
-      room: room.trim() || null,
-      session_type: null,
-      status: "scheduled",
-      gcal_event_id: null,
-    });
+  function openAddForm() {
+    setEditingId(null);
     setSubject("");
     setRoom("");
-    setAdding(false);
+    setTime("09:00");
+    setDateStr(todayDateStr());
+    setFormOpen(true);
+  }
+
+  function openEditForm(session: LocalRow) {
+    setEditingId(session.id as string);
+    setSubject((session["subject_label"] as string) ?? "");
+    setRoom((session["room"] as string) ?? "");
+    const startsAt = session["starts_at"] as string;
+    setTime(timeStrOf(startsAt));
+    setDateStr(dateStrOf(startsAt));
+    setFormOpen(true);
+  }
+
+  function closeForm() {
+    setFormOpen(false);
+    setEditingId(null);
+    setSubject("");
+    setRoom("");
+  }
+
+  async function saveSession() {
+    const label = subject.trim();
+    if (!label || !localDb || !userId) return;
+    const startsAt = dateAtTime(dateStr, time);
+    const endsAt = new Date(new Date(startsAt).getTime() + 60 * 60 * 1000).toISOString();
+
+    if (editingId) {
+      await localDb.put("class_sessions", {
+        id: editingId,
+        user_id: userId,
+        starts_at: startsAt,
+        ends_at: endsAt,
+        subject_label: label,
+        room: room.trim() || null,
+      });
+    } else {
+      await localDb.put("class_sessions", {
+        id: crypto.randomUUID(),
+        user_id: userId,
+        import_id: null, // manually entered, not from the (not-yet-built) timetable pipeline
+        week_start: mondayOf(new Date(dateStr)),
+        starts_at: startsAt,
+        ends_at: endsAt,
+        subject_id: null,
+        subject_label: label,
+        faculty: null,
+        room: room.trim() || null,
+        session_type: null,
+        status: "scheduled",
+        gcal_event_id: null,
+      });
+    }
+    closeForm();
     await refresh();
   }
 
@@ -112,6 +182,9 @@ export function ClassesWidget() {
                     <span className="widget-class__time">{formatTime(s["starts_at"] as string)}</span>
                     <span className="widget-class__subject">{s["subject_label"] as string}</span>
                     {s["room"] ? <span className="widget-class__room">{s["room"] as string}</span> : null}
+                    <button className="widget-task__edit" title="Edit" onClick={() => openEditForm(s)}>
+                      <Pencil size={11} strokeWidth={2} />
+                    </button>
                     <button className="widget-task__delete" title="Delete" onClick={() => void deleteSession(s)}>
                       <Trash2 size={11} strokeWidth={2} />
                     </button>
@@ -119,39 +192,59 @@ export function ClassesWidget() {
                 ))}
               </ul>
             )}
-            {adding ? (
+            {formOpen ? (
               <form
                 className="widget-class-add"
                 onSubmit={(e) => {
                   e.preventDefault();
-                  void addSession();
+                  void saveSession();
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === "Escape") {
+                    e.preventDefault();
+                    closeForm();
+                  }
                 }}
               >
-                <input
-                  className="widget-class-add__time"
-                  type="time"
-                  value={time}
-                  onChange={(e) => setTime(e.target.value)}
-                  autoFocus
-                />
-                <input
-                  className="widget-class-add__subject"
-                  placeholder="Subject"
-                  value={subject}
-                  onChange={(e) => setSubject(e.target.value)}
-                />
-                <input
-                  className="widget-class-add__room"
-                  placeholder="Room"
-                  value={room}
-                  onChange={(e) => setRoom(e.target.value)}
-                />
-                <button type="submit" className="icon-btn" title="Add">
-                  <Plus size={13} strokeWidth={2} />
-                </button>
+                <div className="widget-class-add__row">
+                  <input
+                    className="widget-class-add__date"
+                    type="date"
+                    value={dateStr}
+                    onChange={(e) => setDateStr(e.target.value)}
+                    title="Date"
+                  />
+                  <input
+                    className="widget-class-add__time"
+                    type="time"
+                    value={time}
+                    onChange={(e) => setTime(e.target.value)}
+                    autoFocus
+                  />
+                </div>
+                <div className="widget-class-add__row">
+                  <input
+                    className="widget-class-add__subject"
+                    placeholder="Subject"
+                    value={subject}
+                    onChange={(e) => setSubject(e.target.value)}
+                  />
+                  <input
+                    className="widget-class-add__room"
+                    placeholder="Room"
+                    value={room}
+                    onChange={(e) => setRoom(e.target.value)}
+                  />
+                  <button type="submit" className="icon-btn" title={editingId ? "Save" : "Add"}>
+                    <Plus size={13} strokeWidth={2} />
+                  </button>
+                  <button type="button" className="icon-btn" title="Cancel" onClick={closeForm}>
+                    <X size={13} strokeWidth={2} />
+                  </button>
+                </div>
               </form>
             ) : (
-              <button className="widget-task-add" onClick={() => setAdding(true)}>
+              <button className="widget-task-add" onClick={openAddForm}>
                 <Plus size={13} strokeWidth={2} />
                 <span className="widget-task-add__input">Add a class…</span>
               </button>

@@ -1741,6 +1741,7 @@ body.widget-window {
 }
 
 .widget-task__flag,
+.widget-task__edit,
 .widget-task__delete {
   display: flex;
   align-items: center;
@@ -1759,11 +1760,13 @@ body.widget-window {
 
 .widget-task--full:hover .widget-task__flag,
 .widget-task--full:hover .widget-task__delete,
+.widget-class:hover .widget-task__edit,
 .widget-class:hover .widget-task__delete {
   opacity: 1;
 }
 
-.widget-task__flag:hover {
+.widget-task__flag:hover,
+.widget-task__edit:hover {
   background: var(--surface-3);
   color: var(--ink);
 }
@@ -1811,14 +1814,20 @@ body.widget-window {
 
 .widget-class-add {
   display: flex;
-  align-items: center;
+  flex-direction: column;
   gap: var(--space-1);
   margin-top: var(--space-1);
   padding: var(--space-1);
 }
 
+.widget-class-add__row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+}
+
+.widget-class-add__date,
 .widget-class-add__time {
-  width: 66px;
   flex-shrink: 0;
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);
@@ -1826,6 +1835,15 @@ body.widget-window {
   color: var(--ink);
   font-size: var(--text-xs);
   padding: 3px 4px;
+}
+
+.widget-class-add__date {
+  flex: 1;
+  min-width: 0;
+}
+
+.widget-class-add__time {
+  width: 66px;
 }
 
 .widget-class-add__subject,
