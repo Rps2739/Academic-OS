@@ -19,6 +19,7 @@ import { supabase } from "../lib/supabase";
 import { relativeTime } from "../lib/format";
 import { readPref, writePref, readCustomFeeds, writeCustomFeeds } from "../lib/reading-prefs";
 import { MarketsPanel } from "./MarketsPanel";
+import { ArticleReader, type ReaderArticle } from "./ArticleReader";
 
 interface NewsViewProps {
   localDb: SqliteLocalDb;
@@ -85,6 +86,7 @@ export function NewsView({ localDb, userId, onChanged, onNotify }: NewsViewProps
   const [manageOpen, setManageOpen] = useState(false);
   const [customFeeds, setCustomFeeds] = useState<Record<string, string[]>>(() => readCustomFeeds());
   const [newFeedUrl, setNewFeedUrl] = useState("");
+  const [readerArticle, setReaderArticle] = useState<ReaderArticle | null>(null);
   // Never rendered — used only for its markdown-to-blocks conversion, so
   // "Save to note" produces real BlockNote blocks rather than hand-crafted
   // JSON that could drift from the library's actual schema.
@@ -113,6 +115,7 @@ export function NewsView({ localDb, userId, onChanged, onNotify }: NewsViewProps
   }, [userId]);
 
   useEffect(() => {
+    setReaderArticle(null);
     if (tab === "saved" || tab === "markets") return;
     void loadCategory(activeCategory, false);
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -315,13 +318,17 @@ export function NewsView({ localDb, userId, onChanged, onNotify }: NewsViewProps
 
   function ArticleRow({ item, saved }: { item: NewsItem; saved: boolean }) {
     return (
-      <div className="news-item">
+      <div className={`news-item ${readerArticle?.link === item.link ? "news-item--open" : ""}`}>
         <button
           className="news-item__body"
-          onClick={() => {
-            const safe = safeExternalUrl(item.link);
-            if (safe) void openUrl(safe);
-          }}
+          onClick={() =>
+            setReaderArticle({
+              title: item.title,
+              link: item.link,
+              source: item.source,
+              published_at: item.published_at,
+            })
+          }
         >
           <div className="news-item__title-row">
             <div className="news-item__title">{item.title}</div>
@@ -465,64 +472,76 @@ export function NewsView({ localDb, userId, onChanged, onNotify }: NewsViewProps
 
       {tab === "markets" ? (
         <MarketsPanel localDb={localDb} userId={userId} onNotify={onNotify} />
-      ) : tab === "saved" ? (
-        <div className="news-list">
-          {savedItems.length === 0 ? (
-            <div className="news-view__empty">No bookmarks yet. Star an article to save it here.</div>
-          ) : (
-            savedItems.map((item) => {
-              const row = savedRows.find((r) => r.id === item.id);
-              return (
-                <div className="news-item" key={item.id}>
-                  <button
-                    className="news-item__body"
-                    onClick={() => {
-                      const safe = safeExternalUrl(item.link);
-                      if (safe) void openUrl(safe);
-                    }}
-                  >
-                    <div className="news-item__title">{item.title}</div>
-                    <div className="news-item__meta">
-                      {item.source ?? "Unknown source"}
-                      {item.published_at ? ` · ${relativeTime(item.published_at)}` : ""}
-                    </div>
-                    {item.summary && <div className="news-item__summary">{item.summary}</div>}
-                  </button>
-                  <div className="news-item__actions">
-                    <button
-                      className="icon-btn"
-                      title="Open link"
-                      onClick={() => {
-                        const safe = safeExternalUrl(item.link);
-                        if (safe) void openUrl(safe);
-                      }}
-                    >
-                      <ExternalLink size={14} strokeWidth={2} />
-                    </button>
-                    <button
-                      className="icon-btn"
-                      title="Remove bookmark"
-                      onClick={() => row && void removeSaved(row)}
-                    >
-                      <XIcon size={14} strokeWidth={2} />
-                    </button>
-                  </div>
-                </div>
-              );
-            })
-          )}
-        </div>
       ) : (
-        <div className="news-list">
-          {loading && items.length === 0 ? (
-            <div className="news-view__empty">
-              <span className="spinner" aria-hidden /> Loading…
+        <div className={`news-view__layout ${readerArticle ? "news-view__layout--split" : ""}`}>
+          {tab === "saved" ? (
+            <div className="news-list">
+              {savedItems.length === 0 ? (
+                <div className="news-view__empty">No bookmarks yet. Star an article to save it here.</div>
+              ) : (
+                savedItems.map((item) => {
+                  const row = savedRows.find((r) => r.id === item.id);
+                  return (
+                    <div
+                      className={`news-item ${readerArticle?.link === item.link ? "news-item--open" : ""}`}
+                      key={item.id}
+                    >
+                      <button
+                        className="news-item__body"
+                        onClick={() =>
+                          setReaderArticle({
+                            title: item.title,
+                            link: item.link,
+                            source: item.source,
+                            published_at: item.published_at,
+                          })
+                        }
+                      >
+                        <div className="news-item__title">{item.title}</div>
+                        <div className="news-item__meta">
+                          {item.source ?? "Unknown source"}
+                          {item.published_at ? ` · ${relativeTime(item.published_at)}` : ""}
+                        </div>
+                        {item.summary && <div className="news-item__summary">{item.summary}</div>}
+                      </button>
+                      <div className="news-item__actions">
+                        <button
+                          className="icon-btn"
+                          title="Open link"
+                          onClick={() => {
+                            const safe = safeExternalUrl(item.link);
+                            if (safe) void openUrl(safe);
+                          }}
+                        >
+                          <ExternalLink size={14} strokeWidth={2} />
+                        </button>
+                        <button
+                          className="icon-btn"
+                          title="Remove bookmark"
+                          onClick={() => row && void removeSaved(row)}
+                        >
+                          <XIcon size={14} strokeWidth={2} />
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })
+              )}
             </div>
-          ) : items.length === 0 ? (
-            <div className="news-view__empty">No articles right now. Try refreshing.</div>
           ) : (
-            items.map((item) => <ArticleRow key={item.id} item={item} saved={savedLinks.has(item.link)} />)
+            <div className="news-list">
+              {loading && items.length === 0 ? (
+                <div className="news-view__empty">
+                  <span className="spinner" aria-hidden /> Loading…
+                </div>
+              ) : items.length === 0 ? (
+                <div className="news-view__empty">No articles right now. Try refreshing.</div>
+              ) : (
+                items.map((item) => <ArticleRow key={item.id} item={item} saved={savedLinks.has(item.link)} />)
+              )}
+            </div>
           )}
+          {readerArticle && <ArticleReader article={readerArticle} onClose={() => setReaderArticle(null)} />}
         </div>
       )}
     </div>

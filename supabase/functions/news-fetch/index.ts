@@ -5,6 +5,7 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.114.0";
 import { XMLParser } from "https://esm.sh/fast-xml-parser@4.5.0";
 import { corsHeaders } from "../_shared/cors.ts";
+import { validateExternalUrl, safeFetch } from "../_shared/url-safety.ts";
 import { FEEDS, type Feed } from "./feeds.ts";
 
 export interface NewsItem {
@@ -150,7 +151,10 @@ function parseFeed(xml: string, feed: Feed, category: string): NewsItem[] {
 }
 
 async function fetchFeed(feed: Feed, category: string): Promise<NewsItem[]> {
-  const res = await fetch(feed.url, {
+  // safeFetch re-validates every redirect hop — this handles both the
+  // curated feed list and user-supplied extraFeeds identically, since a
+  // redirect-bypass doesn't care which list a URL came from.
+  const res = await safeFetch(feed.url, {
     signal: AbortSignal.timeout(FEED_TIMEOUT_MS),
     headers: {
       "User-Agent":
@@ -163,33 +167,11 @@ async function fetchFeed(feed: Feed, category: string): Promise<NewsItem[]> {
   return parseFeed(xml, feed, category);
 }
 
-/** Blocks user-supplied feed URLs from targeting internal/private network
- * ranges — this endpoint fetches server-side on the caller's behalf and must
- * never become an open SSRF proxy, even though the caller is a single user. */
-function isPrivateOrLocalHost(hostname: string): boolean {
-  const h = hostname.toLowerCase();
-  if (h === "localhost" || h === "0.0.0.0" || h === "::1" || h === "[::1]") return true;
-  const m = h.match(/^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/);
-  if (m) {
-    const [a, b] = [Number(m[1]), Number(m[2])];
-    if (a === 127) return true;
-    if (a === 10) return true;
-    if (a === 169 && b === 254) return true;
-    if (a === 172 && b >= 16 && b <= 31) return true;
-    if (a === 192 && b === 168) return true;
-  }
-  return false;
-}
-
-function validateExtraFeed(url: string): Feed | null {
-  try {
-    const u = new URL(url);
-    if (u.protocol !== "http:" && u.protocol !== "https:") return null;
-    if (isPrivateOrLocalHost(u.hostname)) return null;
-    return { url: u.toString(), source: u.hostname.replace(/^www\./, "") };
-  } catch {
-    return null;
-  }
+async function validateExtraFeed(url: string): Promise<Feed | null> {
+  const safe = await validateExternalUrl(url);
+  if (!safe) return null;
+  const hostname = new URL(safe).hostname;
+  return { url: safe, source: hostname.replace(/^www\./, "") };
 }
 
 Deno.serve(async (req) => {
@@ -227,10 +209,10 @@ Deno.serve(async (req) => {
       });
     }
 
-    const extraFeeds = rawExtra
-      .slice(0, MAX_EXTRA_FEEDS)
-      .map((u) => (typeof u === "string" ? validateExtraFeed(u) : null))
-      .filter((f): f is Feed => f !== null);
+    const extraFeedCandidates = await Promise.all(
+      rawExtra.slice(0, MAX_EXTRA_FEEDS).map((u) => (typeof u === "string" ? validateExtraFeed(u) : null))
+    );
+    const extraFeeds = extraFeedCandidates.filter((f): f is Feed => f !== null);
 
     const allFeeds = [...baseFeeds, ...extraFeeds];
 
