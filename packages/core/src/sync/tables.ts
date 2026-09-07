@@ -14,6 +14,8 @@ export const SYNC_TABLES = [
   "timetable_imports",
   "class_sessions",
   "attendance_marks",
+  "saved_articles",
+  "watchlist_items",
 ] as const;
 
 export type TableName = (typeof SYNC_TABLES)[number];

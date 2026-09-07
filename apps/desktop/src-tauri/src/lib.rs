@@ -171,6 +171,53 @@ fn migrations() -> Vec<Migration> {
         sql: "
             ALTER TABLE projects ADD COLUMN subject_id TEXT;
         ",
+    }, Migration {
+        // Local-only cache for the News dashboard — deliberately NOT in
+        // SYNC_TABLES (same pattern as page_versions_local): news content is
+        // re-fetchable from the internet, not user data, so it never needs to
+        // reach Postgres or another device. Read/written via localDb.raw.
+        version: 4,
+        description: "news_cache_local",
+        kind: MigrationKind::Up,
+        sql: "
+            CREATE TABLE news_items_local (
+                id TEXT PRIMARY KEY,
+                category TEXT NOT NULL,
+                title TEXT NOT NULL,
+                link TEXT NOT NULL,
+                source TEXT,
+                summary TEXT,
+                published_at TEXT,
+                fetched_at TEXT NOT NULL
+            );
+            CREATE INDEX idx_news_cat_pub ON news_items_local (category, published_at DESC);
+        ",
+    }, Migration {
+        version: 5,
+        description: "saved_articles",
+        kind: MigrationKind::Up,
+        sql: "
+            CREATE TABLE saved_articles (
+                id TEXT PRIMARY KEY, user_id TEXT NOT NULL, created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL, deleted_at TEXT,
+                title TEXT NOT NULL, link TEXT NOT NULL, source TEXT, summary TEXT,
+                category TEXT, published_at TEXT, note TEXT,
+                dirty INTEGER NOT NULL DEFAULT 0
+            );
+        ",
+    }, Migration {
+        version: 6,
+        description: "watchlist_items",
+        kind: MigrationKind::Up,
+        sql: "
+            CREATE TABLE watchlist_items (
+                id TEXT PRIMARY KEY, user_id TEXT NOT NULL, created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL, deleted_at TEXT,
+                symbol TEXT NOT NULL, kind TEXT NOT NULL, display_name TEXT,
+                scheme_code TEXT, sort_order REAL NOT NULL DEFAULT 0,
+                dirty INTEGER NOT NULL DEFAULT 0
+            );
+        ",
     }]
 }
 

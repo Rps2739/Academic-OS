@@ -22,6 +22,8 @@ export const PK_COLUMN: Record<TableName, string> = {
   timetable_imports: "id",
   class_sessions: "id",
   attendance_marks: "id",
+  saved_articles: "id",
+  watchlist_items: "id",
 };
 
 /** Columns holding JSON — stored as TEXT locally, parsed on read. */
@@ -139,6 +141,24 @@ export const TABLE_COLUMNS: Record<TableName, Record<string, SqliteType>> = {
     class_session_id: "TEXT",
     marked_for: "TEXT",
     state: "TEXT",
+  },
+  saved_articles: {
+    ...universalColumns,
+    title: "TEXT",
+    link: "TEXT",
+    source: "TEXT",
+    summary: "TEXT",
+    category: "TEXT",
+    published_at: "TEXT",
+    note: "TEXT",
+  },
+  watchlist_items: {
+    ...universalColumns,
+    symbol: "TEXT",
+    kind: "TEXT",
+    display_name: "TEXT",
+    scheme_code: "TEXT",
+    sort_order: "REAL",
   },
 };
 

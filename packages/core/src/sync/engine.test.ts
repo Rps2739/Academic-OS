@@ -30,6 +30,31 @@ class ThrowsOnPushRemoteDb implements RemoteDb {
   }
 }
 
+/**
+ * Simulates a table whose Postgres migration hasn't been applied yet —
+ * exactly what happens when a new SYNC_TABLES entry is added to the app
+ * before the user runs the corresponding migration in the Supabase
+ * Dashboard (a real, expected sequencing gap this project's workflow
+ * relies on — see CLAUDE.md's "user runs migrations" constraint).
+ */
+class ThrowsOnPullRemoteDb implements RemoteDb {
+  constructor(
+    private readonly inner: RemoteDb,
+    private readonly failingTable: TableName
+  ) {}
+
+  push(table: TableName, rows: SyncRow[]): Promise<Array<{ id: string; updated_at: string }>> {
+    return this.inner.push(table, rows);
+  }
+
+  pull(table: TableName, since: string): Promise<SyncRow[]> {
+    if (table === this.failingTable) {
+      return Promise.reject(new Error(`relation "public.${table}" does not exist`));
+    }
+    return this.inner.pull(table, since);
+  }
+}
+
 const USER = "11111111-1111-1111-1111-111111111111";
 
 function freshWorld() {
@@ -192,6 +217,51 @@ describe("sync engine — Phase 0 gate (design manual §7, §8 task 0.6)", () =>
     expect((await deviceA.getLocal("class_sessions", "session-1"))?.dirty).toBe(false);
     const onServer = await remote.pull("class_sessions", "1970-01-01T00:00:00.000Z");
     expect(onServer.find((r) => r.id === "session-1")).toBeDefined();
+  });
+
+  it("a table's pull failing doesn't block tables listed after it, and the sync cursor still advances", async () => {
+    const { remote, deviceA, deviceB } = freshWorld();
+
+    // Device B creates rows in two tables and syncs them up first, so
+    // there's something for device A to pull down.
+    await deviceB.put("timetable_imports", {
+      id: "import-1",
+      user_id: USER,
+      source: "manual_upload",
+      week_start: "2026-01-05",
+      raw: [],
+      checksum: "some-checksum",
+      parsed_ok: true,
+    });
+    await deviceB.put("class_sessions", {
+      id: "session-1",
+      user_id: USER,
+      import_id: "import-1",
+      week_start: "2026-01-05",
+      starts_at: "2026-01-05T09:00:00.000Z",
+      ends_at: "2026-01-05T10:00:00.000Z",
+      subject_label: "Test Subject",
+      status: "scheduled",
+    });
+    await sync(deviceB, remote, "device-B");
+
+    // Device A syncs against a remote whose timetable_imports table isn't
+    // reachable (its Postgres migration hasn't been applied) —
+    // timetable_imports comes right before class_sessions in SYNC_TABLES.
+    const flakyRemote = new ThrowsOnPullRemoteDb(remote, "timetable_imports");
+    const consoleErr = vi.spyOn(console, "error").mockImplementation(() => {});
+    await sync(deviceA, flakyRemote, "device-A");
+    consoleErr.mockRestore();
+
+    // class_sessions, listed AFTER the failing table, must still have
+    // pulled — nothing to do with timetable_imports' own failure.
+    expect((await deviceA.getLocal("class_sessions", "session-1"))?.["subject_label"]).toBe("Test Subject");
+
+    // A second sync round (now against the real, working remote) must
+    // still converge timetable_imports — proving the cursor wasn't
+    // silently advanced past it while it was failing.
+    await sync(deviceA, remote, "device-A");
+    expect((await deviceA.getLocal("timetable_imports", "import-1"))?.["checksum"]).toBe("some-checksum");
   });
 });
 

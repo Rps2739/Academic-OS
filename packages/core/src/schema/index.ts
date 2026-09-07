@@ -9,3 +9,5 @@ export * from "./timetable";
 export * from "./attendance";
 export * from "./embedding";
 export * from "./user-settings";
+export * from "./saved-article";
+export * from "./watchlist-item";

@@ -12,44 +12,73 @@ const EPOCH = "1970-01-01T00:00:00.000Z";
  * caught and archived *before* push has a chance to clear its dirty flag —
  * if push ran first, every local edit would already be clean by the time
  * pull looked at it, and no conflict would ever be detected.
+ *
+ * Each table's pull is isolated in its own try/catch, mirroring push()'s
+ * fix for the 2026-09-04 incident — same failure mode, different
+ * direction. Without this, a table that errors (e.g. its Postgres
+ * migration hasn't been applied yet, or a transient network blip) throws
+ * out of the whole function, which — because SYNC_TABLES has a fixed
+ * order — skips every table listed after it. Confirmed live: adding
+ * saved_articles/watchlist_items to SYNC_TABLES ahead of the user running
+ * their Postgres migrations reproduced this exact error (see
+ * memory/project_next_audit_task.md).
+ *
+ * There is only ONE last_pulled_at cursor shared by every table (not one
+ * per table), so it must only advance when EVERY table succeeds this
+ * round. Advancing it past a still-failing table's own rows — even
+ * though the *reason* to advance came from a different, successful
+ * table's newer timestamp — would permanently skip that failing table's
+ * unsynced rows the moment it starts working again, since the next
+ * round's `since` would already be past them. Safer to leave the cursor
+ * exactly where it was: every table simply re-pulls the same range next
+ * round (wasteful — applyRemote is an idempotent upsert — but never
+ * lossy) until the whole round finally goes clean.
  */
 async function pull(local: LocalDb, remote: RemoteDb, deviceId: string): Promise<void> {
   const since = (await local.getMeta(LAST_PULLED_AT_KEY)) ?? EPOCH;
   let maxSeen = since;
+  let allSucceeded = true;
 
   for (const table of SYNC_TABLES) {
-    const remoteRows = await remote.pull(table, since);
+    try {
+      const remoteRows = await remote.pull(table, since);
 
-    for (const remoteRow of remoteRows) {
-      if (remoteRow.updated_at > maxSeen) maxSeen = remoteRow.updated_at;
+      for (const remoteRow of remoteRows) {
+        if (remoteRow.updated_at > maxSeen) maxSeen = remoteRow.updated_at;
 
-      const localRow = await local.getLocal(table, remoteRow.id);
+        const localRow = await local.getLocal(table, remoteRow.id);
 
-      if (!localRow || !localRow.dirty) {
-        await local.applyRemote(table, remoteRow);
-        continue;
-      }
-
-      // Conflict: this device has an unpushed edit AND the server has a
-      // newer version (someone else's sync landed first).
-      if (remoteRow.updated_at > localRow.updated_at) {
-        if (table === "page_bodies") {
-          await local.appendPageVersion({
-            node_id: localRow.id,
-            blocks: localRow["blocks"],
-            markdown: (localRow["markdown"] as string | null) ?? null,
-            device_id: deviceId,
-          });
+        if (!localRow || !localRow.dirty) {
+          await local.applyRemote(table, remoteRow);
+          continue;
         }
-        await local.applyRemote(table, remoteRow);
+
+        // Conflict: this device has an unpushed edit AND the server has a
+        // newer version (someone else's sync landed first).
+        if (remoteRow.updated_at > localRow.updated_at) {
+          if (table === "page_bodies") {
+            await local.appendPageVersion({
+              node_id: localRow.id,
+              blocks: localRow["blocks"],
+              markdown: (localRow["markdown"] as string | null) ?? null,
+              device_id: deviceId,
+            });
+          }
+          await local.applyRemote(table, remoteRow);
+        }
+        // else: local edit is newer than what the server had at pull time —
+        // leave it dirty. The push step below will send it up and it becomes
+        // the new server truth.
       }
-      // else: local edit is newer than what the server had at pull time —
-      // leave it dirty. The push step below will send it up and it becomes
-      // the new server truth.
+    } catch (err) {
+      allSucceeded = false;
+      console.error(`pull(${table}) failed, skipping this table for this round:`, err);
     }
   }
 
-  await local.setMeta(LAST_PULLED_AT_KEY, maxSeen);
+  if (allSucceeded) {
+    await local.setMeta(LAST_PULLED_AT_KEY, maxSeen);
+  }
 }
 
 /**

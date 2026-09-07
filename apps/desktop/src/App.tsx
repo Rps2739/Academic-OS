@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import type { LocalRow } from "@academic-os/core";
-import { FileText, NotebookText, ListTodo, CalendarDays, Undo2, Home, BookOpen, Briefcase, Columns2, X } from "lucide-react";
+import { FileText, NotebookText, ListTodo, CalendarDays, Undo2, Home, BookOpen, Briefcase, Columns2, X, Newspaper } from "lucide-react";
 import { AuthGate } from "./components/AuthGate";
 import { TreeSidebar } from "./components/TreeSidebar";
 import { PageEditor } from "./components/PageEditor";
@@ -12,6 +12,7 @@ import { TimetableView } from "./components/TimetableView";
 import { HomeView } from "./components/HomeView";
 import { SubjectsView } from "./components/SubjectsView";
 import { ProjectsView } from "./components/ProjectsView";
+import { NewsView } from "./components/NewsView";
 import { SqliteLocalDb } from "./lib/sqlite-local-db";
 import { createSyncController } from "./lib/sync-loop";
 import { createGTasksSyncController } from "./lib/gtasks-sync-loop";
@@ -19,7 +20,7 @@ import { createGCalSyncController } from "./lib/gcal-sync-loop";
 import { enable as enableAutostart, isEnabled as isAutostartEnabled } from "@tauri-apps/plugin-autostart";
 import "./App.css";
 
-type View = "home" | "notes" | "tasks" | "subjects" | "projects" | "timetable";
+type View = "home" | "notes" | "tasks" | "subjects" | "projects" | "timetable" | "news";
 
 function MainLayout({ userId }: { userId: string }) {
   const [localDb, setLocalDb] = useState<SqliteLocalDb | null>(null);
@@ -123,6 +124,7 @@ function MainLayout({ userId }: { userId: string }) {
           { id: "subjects", label: "Subjects", Icon: BookOpen },
           { id: "projects", label: "Projects", Icon: Briefcase },
           { id: "timetable", label: "Timetable", Icon: CalendarDays },
+          { id: "news", label: "News", Icon: Newspaper },
         ] as const).map(({ id, label, Icon }) => (
           <button
             key={id}
@@ -250,6 +252,10 @@ function MainLayout({ userId }: { userId: string }) {
       ) : view === "projects" ? (
         <main className="app-main app-main--projects">
           <ProjectsView localDb={localDb} userId={userId} onChanged={triggerSync} onNotify={notify} />
+        </main>
+      ) : view === "news" ? (
+        <main className="app-main app-main--news">
+          <NewsView localDb={localDb} userId={userId} onChanged={triggerSync} onNotify={notify} />
         </main>
       ) : (
         <main className="app-main app-main--timetable">
