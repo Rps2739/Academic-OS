@@ -24,6 +24,17 @@ interface MfSearchResult {
   schemeName: string;
 }
 
+interface MoverQuote extends Quote {
+  shortName: string | null;
+}
+
+interface FundPerformance {
+  schemeCode: string;
+  schemeName: string;
+  latestNav: number;
+  changePercent: number | null;
+}
+
 const INDICES = [
   { symbol: "^NSEI", label: "Nifty 50" },
   { symbol: "^BSESN", label: "Sensex" },
@@ -71,8 +82,9 @@ export function MarketsPanel({ localDb, userId, onNotify }: MarketsPanelProps) {
   const [indexQuotes, setIndexQuotes] = useState<Record<string, Quote>>({});
   const [watchlist, setWatchlist] = useState<LocalRow[]>([]);
   const [watchlistQuotes, setWatchlistQuotes] = useState<Record<string, Quote>>({});
-  const [trending, setTrending] = useState<string[]>([]);
-  const [trendingQuotes, setTrendingQuotes] = useState<Record<string, Quote>>({});
+  const [gainers, setGainers] = useState<MoverQuote[]>([]);
+  const [losers, setLosers] = useState<MoverQuote[]>([]);
+  const [topFunds, setTopFunds] = useState<FundPerformance[]>([]);
   const [expandedSymbol, setExpandedSymbol] = useState<string | null>(null);
   const [candles, setCandles] = useState<Candle[]>([]);
   const [candlesLoading, setCandlesLoading] = useState(false);
@@ -116,20 +128,22 @@ export function MarketsPanel({ localDb, userId, onNotify }: MarketsPanelProps) {
         setWatchlistQuotes(byWatch);
       }
 
-      const { data: trendData, error: trendErr } = await supabase.functions.invoke("markets-fetch", {
-        body: { type: "trending" },
+      // "Today's movers" — a curated large-cap list (see the Edge Function's
+      // curated.ts for why Yahoo's own gainer/loser screeners aren't used:
+      // verified live to return only obscure, thinly-traded micro-caps).
+      const { data: moversData, error: moversErr } = await supabase.functions.invoke("markets-fetch", {
+        body: { type: "movers" },
       });
-      if (!trendErr) {
-        const symbols = ((trendData?.result ?? []) as string[]).slice(0, 8);
-        setTrending(symbols);
-        if (symbols.length > 0) {
-          const { data: tq } = await supabase.functions.invoke("markets-fetch", {
-            body: { type: "quotes", symbols },
-          });
-          const byTrend: Record<string, Quote> = {};
-          ((tq?.result ?? []) as Quote[]).forEach((q) => (byTrend[q.symbol] = q));
-          setTrendingQuotes(byTrend);
-        }
+      if (!moversErr) {
+        setGainers((moversData?.result?.gainers ?? []) as MoverQuote[]);
+        setLosers((moversData?.result?.losers ?? []) as MoverQuote[]);
+      }
+
+      const { data: fundsData, error: fundsErr } = await supabase.functions.invoke("markets-fetch", {
+        body: { type: "top-mfs" },
+      });
+      if (!fundsErr) {
+        setTopFunds((fundsData?.result ?? []) as FundPerformance[]);
       }
     } catch (err) {
       console.error("markets-fetch failed:", err);
@@ -313,27 +327,78 @@ export function MarketsPanel({ localDb, userId, onNotify }: MarketsPanelProps) {
       </div>
 
       <div className="markets-panel__section">
-        <h3 className="markets-panel__section-title">Trending</h3>
-        {trending.length === 0 ? (
-          <div className="news-view__empty">No trending data right now.</div>
-        ) : (
-          <div className="markets-trending">
-            {trending.map((symbol) => {
-              const q = trendingQuotes[symbol];
-              const alreadyAdded = stockWatchlist.some((w) => w["symbol"] === symbol);
-              return (
-                <div key={symbol} className="markets-trending-chip">
-                  <span>{symbol}</span>
-                  <ChangeBadge pct={q?.changePercent ?? null} />
-                  {!alreadyAdded && (
-                    <button className="icon-btn" title="Add to watchlist" onClick={() => void addToWatchlist(symbol, "stock")}>
-                      <Plus size={12} strokeWidth={2} />
-                    </button>
-                  )}
-                </div>
-              );
-            })}
+        <h3 className="markets-panel__section-title">Today's Top Movers</h3>
+        <p className="markets-panel__section-hint">Among well-known large-cap stocks, not the broader market.</p>
+        <div className="markets-movers">
+          <div className="markets-movers__col">
+            <span className="markets-movers__col-label">Gainers</span>
+            {gainers.length === 0 && !loading ? (
+              <div className="news-view__empty">No data right now.</div>
+            ) : (
+              gainers.map((m) => {
+                const alreadyAdded = stockWatchlist.some((w) => w["symbol"] === m.symbol);
+                return (
+                  <div key={m.symbol} className="markets-mover-row">
+                    <span className="markets-mover-row__name">{m.shortName ?? m.symbol}</span>
+                    <ChangeBadge pct={m.changePercent} />
+                    {!alreadyAdded && (
+                      <button className="icon-btn" title="Add to watchlist" onClick={() => void addToWatchlist(m.symbol, "stock", m.shortName ?? undefined)}>
+                        <Plus size={12} strokeWidth={2} />
+                      </button>
+                    )}
+                  </div>
+                );
+              })
+            )}
           </div>
+          <div className="markets-movers__col">
+            <span className="markets-movers__col-label">Losers</span>
+            {losers.length === 0 && !loading ? (
+              <div className="news-view__empty">No data right now.</div>
+            ) : (
+              losers.map((m) => {
+                const alreadyAdded = stockWatchlist.some((w) => w["symbol"] === m.symbol);
+                return (
+                  <div key={m.symbol} className="markets-mover-row">
+                    <span className="markets-mover-row__name">{m.shortName ?? m.symbol}</span>
+                    <ChangeBadge pct={m.changePercent} />
+                    {!alreadyAdded && (
+                      <button className="icon-btn" title="Add to watchlist" onClick={() => void addToWatchlist(m.symbol, "stock", m.shortName ?? undefined)}>
+                        <Plus size={12} strokeWidth={2} />
+                      </button>
+                    )}
+                  </div>
+                );
+              })
+            )}
+          </div>
+        </div>
+      </div>
+
+      <div className="markets-panel__section">
+        <h3 className="markets-panel__section-title">Top Mutual Funds</h3>
+        <p className="markets-panel__section-hint">A curated mix of well-known funds, not a ranking or recommendation.</p>
+        {topFunds.length === 0 && !loading ? (
+          <div className="news-view__empty">No data right now.</div>
+        ) : (
+          topFunds.map((f) => {
+            const alreadyAdded = mfWatchlist.some((w) => w["scheme_code"] === f.schemeCode);
+            return (
+              <div key={f.schemeCode} className="markets-mover-row">
+                <span className="markets-mover-row__name">{f.schemeName}</span>
+                <ChangeBadge pct={f.changePercent} />
+                {!alreadyAdded && (
+                  <button
+                    className="icon-btn"
+                    title="Add to watchlist"
+                    onClick={() => void addToWatchlist(f.schemeCode, "mf", f.schemeName, f.schemeCode)}
+                  >
+                    <Plus size={12} strokeWidth={2} />
+                  </button>
+                )}
+              </div>
+            );
+          })
         )}
       </div>
 

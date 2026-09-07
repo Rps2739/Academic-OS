@@ -2547,6 +2547,48 @@ body.widget-window {
   color: var(--muted);
 }
 
+.markets-panel__section-hint {
+  margin: calc(-1 * var(--space-2)) 0 var(--space-3);
+  font-size: var(--text-xs);
+  color: var(--muted-2);
+}
+
+.markets-movers {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-4);
+}
+
+.markets-movers__col {
+  display: flex;
+  flex-direction: column;
+}
+
+.markets-movers__col-label {
+  font-size: var(--text-xs);
+  font-weight: 600;
+  color: var(--muted);
+  margin-bottom: var(--space-2);
+}
+
+.markets-mover-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2) 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.markets-mover-row__name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--text-sm);
+  color: var(--ink);
+}
+
 .markets-indices {
   display: flex;
   gap: var(--space-3);
@@ -2636,23 +2678,6 @@ body.widget-window {
 .markets-watch-item__chart {
   flex-basis: 100%;
   margin-top: var(--space-2);
-}
-
-.markets-trending {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--space-2);
-}
-
-.markets-trending-chip {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  padding: 4px var(--space-2);
-  border-radius: var(--radius-full);
-  border: 1px solid var(--border);
-  background: var(--surface-2);
-  font-size: var(--text-xs);
 }
 
 .markets-mf-results {

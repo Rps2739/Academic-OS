@@ -95,17 +95,6 @@ export async function fetchCandles(symbol: string, range = "6mo", interval = "1d
   return candles;
 }
 
-interface TrendingResult {
-  finance?: { result?: Array<{ quotes?: Array<{ symbol?: string }> }> };
-}
-
-export async function fetchTrending(): Promise<string[]> {
-  const url = "https://query1.finance.yahoo.com/v1/finance/trending/IN";
-  const data = (await yahooFetch(url)) as TrendingResult;
-  const quotes = data?.finance?.result?.[0]?.quotes ?? [];
-  return quotes.map((q) => q.symbol).filter((s): s is string => typeof s === "string");
-}
-
 interface MfSearchResult {
   schemeCode: number;
   schemeName: string;
@@ -137,4 +126,77 @@ export async function fetchMutualFundNav(schemeCode: string): Promise<{ schemeNa
     .filter((d) => !isNaN(d.nav))
     .reverse(); // API returns newest-first; chart wants oldest-first
   return { schemeName: data.meta?.scheme_name ?? schemeCode, nav };
+}
+
+export interface MoverQuote extends QuoteResult {
+  shortName: string | null;
+}
+
+/** Batch-quotes a fixed list of symbols and sorts by day change — used
+ * instead of Yahoo's day_gainers/day_losers screeners, which return
+ * meaningless noise from thinly-traded micro-caps (verified live before
+ * this was built). Failures for individual symbols are dropped rather
+ * than failing the whole batch. */
+export async function fetchMovers(symbols: string[]): Promise<MoverQuote[]> {
+  const settled = await Promise.allSettled(
+    symbols.map(async (symbol) => {
+      const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}?range=1d&interval=5m`;
+      const data = (await yahooFetch(url)) as ChartResult & {
+        chart?: { result?: Array<{ meta?: { shortName?: string } }> };
+      };
+      const result = data?.chart?.result?.[0];
+      const meta = result?.meta as { regularMarketPrice?: number; chartPreviousClose?: number; previousClose?: number; currency?: string; shortName?: string } | undefined;
+      const price = meta?.regularMarketPrice ?? null;
+      const prevClose = meta?.chartPreviousClose ?? meta?.previousClose ?? null;
+      const changePercent =
+        price !== null && prevClose !== null && prevClose !== 0 ? ((price - prevClose) / prevClose) * 100 : null;
+      return {
+        symbol,
+        price,
+        previousClose: prevClose,
+        changePercent,
+        currency: meta?.currency ?? null,
+        shortName: meta?.shortName ?? null,
+      } satisfies MoverQuote;
+    })
+  );
+  return settled
+    .filter((r): r is PromiseFulfilledResult<MoverQuote> => r.status === "fulfilled")
+    .map((r) => r.value)
+    .filter((q) => q.changePercent !== null);
+}
+
+export interface FundPerformance {
+  schemeCode: string;
+  schemeName: string;
+  latestNav: number;
+  changePercent: number | null;
+}
+
+/** For each search term, takes the first (most relevant) match and computes
+ * its most recent day-over-day NAV change — mfapi.in has no rankings/
+ * screener endpoint, so "top performing funds" is computed here from a
+ * curated name list rather than sourced from an unverified endpoint. */
+export async function fetchTopMutualFunds(searchTerms: string[]): Promise<FundPerformance[]> {
+  const settled = await Promise.allSettled(
+    searchTerms.map(async (term) => {
+      const matches = await searchMutualFunds(term);
+      const best = matches[0];
+      if (!best) throw new Error(`no match for ${term}`);
+      const { schemeName, nav } = await fetchMutualFundNav(String(best.schemeCode));
+      if (nav.length < 2) throw new Error(`insufficient NAV history for ${term}`);
+      const latest = nav[nav.length - 1];
+      const previous = nav[nav.length - 2];
+      const changePercent = previous.nav !== 0 ? ((latest.nav - previous.nav) / previous.nav) * 100 : null;
+      return {
+        schemeCode: String(best.schemeCode),
+        schemeName,
+        latestNav: latest.nav,
+        changePercent,
+      } satisfies FundPerformance;
+    })
+  );
+  return settled
+    .filter((r): r is PromiseFulfilledResult<FundPerformance> => r.status === "fulfilled")
+    .map((r) => r.value);
 }

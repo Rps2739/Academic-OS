@@ -25,7 +25,6 @@ export const FEEDS: Record<string, Feed[]> = {
     { url: "https://feeds.arstechnica.com/arstechnica/index", source: "Ars Technica" },
     { url: "https://www.theverge.com/rss/index.xml", source: "The Verge" },
     { url: "https://techcrunch.com/feed/", source: "TechCrunch" },
-    { url: "https://hnrss.org/frontpage", source: "Hacker News" },
     { url: "https://www.wired.com/feed/rss", source: "Wired" },
   ],
   business: [

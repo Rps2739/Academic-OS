@@ -3,7 +3,8 @@
 // touching this file or the frontend. No polling — called on open/refresh only.
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.114.0";
 import { corsHeaders } from "../_shared/cors.ts";
-import { fetchQuote, fetchCandles, fetchTrending, searchMutualFunds, fetchMutualFundNav } from "./yahoo.ts";
+import { fetchQuote, fetchCandles, searchMutualFunds, fetchMutualFundNav, fetchMovers, fetchTopMutualFunds } from "./yahoo.ts";
+import { BLUE_CHIP_STOCKS, POPULAR_MF_SEARCH_TERMS } from "./curated.ts";
 
 const MAX_SYMBOLS = 30;
 
@@ -50,8 +51,19 @@ Deno.serve(async (req) => {
         result = await fetchCandles(symbol, body?.range ?? "6mo", body?.interval ?? "1d");
         break;
       }
-      case "trending": {
-        result = await fetchTrending();
+      case "movers": {
+        // "Good performing stocks of the day" — a curated large-cap list
+        // (see curated.ts for why: Yahoo's day_gainers_in/day_losers_in
+        // screeners were verified to return only obscure micro-caps).
+        const quotes = await fetchMovers(BLUE_CHIP_STOCKS);
+        const gainers = [...quotes].sort((a, b) => (b.changePercent ?? -Infinity) - (a.changePercent ?? -Infinity)).slice(0, 8);
+        const losers = [...quotes].sort((a, b) => (a.changePercent ?? Infinity) - (b.changePercent ?? Infinity)).slice(0, 8);
+        result = { gainers, losers };
+        break;
+      }
+      case "top-mfs": {
+        const funds = await fetchTopMutualFunds(POPULAR_MF_SEARCH_TERMS);
+        result = [...funds].sort((a, b) => (b.changePercent ?? -Infinity) - (a.changePercent ?? -Infinity));
         break;
       }
       case "mf-search": {

@@ -21,6 +21,17 @@
 // §7) — a personal, single-user task list makes a genuine concurrent
 // edit on both sides at once vanishingly unlikely.
 //
+// PULL RUNS BEFORE PUSH, deliberately — mirrors the exact fix already
+// applied to the local<->Postgres sync engine, for the identical failure
+// mode: if push ran first using Postgres's not-yet-caught-up state, it
+// would blindly overwrite a fresher change made directly in the Google
+// Tasks app (e.g. completing a task on the phone) with the stale local
+// status, undoing it. Pulling first reconciles Postgres to whatever is
+// actually newer BEFORE push reads it, so push then only ever sends a
+// no-op (already-matching) write in that case instead of an overwrite.
+// (Real incident, 2026-09-07: marking a task done on the phone, or in the
+// desktop widget, was observed reverting back to open shortly after.)
+//
 // Deleting a category folder does NOT delete its Google list — an
 // orphaned list is harmless and reversible; auto-deleting someone's
 // Google Tasks list on a local folder delete is not a trade worth
@@ -153,96 +164,14 @@ Deno.serve(async (req) => {
       return task.node_id ? await listIdForCategory(task.node_id) : defaultListId!;
     }
 
-    // 3. Push: local -> Google.
-    for (const task of localTasks) {
-      if (task.deleted_at) {
-        if (task.google_task_id && task.google_tasklist_id) {
-          await fetch(`${TASKS_API}/lists/${task.google_tasklist_id}/tasks/${task.google_task_id}`, {
-            method: "DELETE",
-            headers: gHeaders,
-          }).catch(() => {}); // already gone on Google's side is fine
-        }
-        continue;
-      }
-
-      const targetList = await targetListFor(task);
-      const body = {
-        title: task.title,
-        notes: task.notes ?? undefined,
-        status: task.status === "done" ? "completed" : "needsAction",
-        due: task.due_at ? new Date(task.due_at).toISOString() : undefined,
-      };
-
-      // Tasks synced before this migration have google_task_id set but
-      // google_tasklist_id still NULL (the column didn't exist yet) —
-      // treat those as having been in the default list, the only one
-      // that existed at the time, rather than as "list unknown" (which
-      // would read as "moved" below and create a duplicate for every
-      // task that had already synced once).
-      const effectiveOldList = task.google_tasklist_id ?? (task.google_task_id ? defaultListId : null);
-
-      if (!task.google_task_id) {
-        const insertRes = await fetch(`${TASKS_API}/lists/${targetList}/tasks`, {
-          method: "POST",
-          headers: gHeaders,
-          body: JSON.stringify(body),
-        });
-        if (insertRes.ok) {
-          const created = (await insertRes.json()) as GTask;
-          // Mutate in place, not just in Postgres — step 4 below builds
-          // its "do we already know this Google task" map from this same
-          // `localTasks` array. Without this, the task we just created
-          // would look brand-new to Google's eyes on the very next line
-          // that reads it, and get inserted a second time as a duplicate.
-          task.google_task_id = created.id;
-          task.google_tasklist_id = targetList;
-          await supabase
-            .from("tasks")
-            .update({ google_task_id: created.id, google_tasklist_id: targetList })
-            .eq("id", task.id);
-        }
-      } else if (effectiveOldList === targetList) {
-        await fetch(`${TASKS_API}/lists/${targetList}/tasks/${task.google_task_id}`, {
-          method: "PATCH",
-          headers: gHeaders,
-          body: JSON.stringify(body),
-        });
-      } else {
-        // Category changed since the last sync — Tasks API has no
-        // cross-list move, so delete the old copy and recreate it.
-        if (effectiveOldList) {
-          await fetch(`${TASKS_API}/lists/${effectiveOldList}/tasks/${task.google_task_id}`, {
-            method: "DELETE",
-            headers: gHeaders,
-          }).catch(() => {});
-        }
-        const insertRes = await fetch(`${TASKS_API}/lists/${targetList}/tasks`, {
-          method: "POST",
-          headers: gHeaders,
-          body: JSON.stringify(body),
-        });
-        if (insertRes.ok) {
-          const created = (await insertRes.json()) as GTask;
-          task.google_task_id = created.id; // see comment above
-          task.google_tasklist_id = targetList;
-          await supabase
-            .from("tasks")
-            .update({ google_task_id: created.id, google_tasklist_id: targetList })
-            .eq("id", task.id);
-        }
-      }
-    }
-
-    // 4. Pull: Google -> local, one list at a time (default + every
-    // category list we know about).
+    // 3. Pull: Google -> local, one list at a time (default + every
+    // category list we know about). Runs BEFORE push — see the file-level
+    // comment for why this order matters.
     const listsToPull = new Map<string, string | null>([[defaultListId!, null]]);
     for (const node of categories.values()) {
       if (node.google_tasklist_id) listsToPull.set(node.google_tasklist_id, node.id);
     }
 
-    // Built AFTER the push loop above, which mutates google_task_id /
-    // google_tasklist_id in place on these same objects when it creates
-    // or moves a task — this map must see those fresh values.
     const localByGoogleId = new Map(localTasks.filter((t) => t.google_task_id).map((t) => [t.google_task_id as string, t]));
     const seenGoogleIds = new Set<string>();
     // Only lists we actually fetched successfully are trustworthy for the
@@ -286,15 +215,104 @@ Deno.serve(async (req) => {
         if (existing.deleted_at) continue; // about to be deleted on Google's side too, below
 
         // Only apply Google's version if it's actually newer than what we
-        // just pushed above — otherwise this is just Google echoing back
-        // the write we made a moment ago.
+        // have locally — otherwise this is just Google echoing back a
+        // write we're about to make (or already made) ourselves.
         const googleUpdated = gtask.updated ? new Date(gtask.updated).getTime() : 0;
         const localUpdated = new Date(existing.updated_at).getTime();
         if (googleUpdated > localUpdated + 5000) {
+          const newUpdatedAt = new Date().toISOString();
           await supabase
             .from("tasks")
             .update({ title: gtask.title || existing.title, notes: gtask.notes ?? null, due_at: dueAt, status })
             .eq("id", existing.id);
+          // Mutate in place, not just in Postgres — the push loop below
+          // reads this same `localTasks` array. Without this, push would
+          // still see the stale pre-pull status and immediately shove it
+          // back onto Google, undoing the very update just applied (this
+          // was the actual bug: a phone-side completion getting reverted
+          // by the next sync round because push never saw it).
+          existing.title = gtask.title || existing.title;
+          existing.notes = gtask.notes ?? null;
+          existing.due_at = dueAt;
+          existing.status = status;
+          existing.updated_at = newUpdatedAt;
+        }
+      }
+    }
+
+    // 4. Push: local -> Google. Now operating on `localTasks` as
+    // reconciled by the pull step above, so a task Google already has the
+    // newer version of gets pushed back as a no-op rather than an overwrite.
+    for (const task of localTasks) {
+      if (task.deleted_at) {
+        if (task.google_task_id && task.google_tasklist_id) {
+          await fetch(`${TASKS_API}/lists/${task.google_tasklist_id}/tasks/${task.google_task_id}`, {
+            method: "DELETE",
+            headers: gHeaders,
+          }).catch(() => {}); // already gone on Google's side is fine
+        }
+        continue;
+      }
+
+      const targetList = await targetListFor(task);
+      const body = {
+        title: task.title,
+        notes: task.notes ?? undefined,
+        status: task.status === "done" ? "completed" : "needsAction",
+        due: task.due_at ? new Date(task.due_at).toISOString() : undefined,
+      };
+
+      // Tasks synced before this migration have google_task_id set but
+      // google_tasklist_id still NULL (the column didn't exist yet) —
+      // treat those as having been in the default list, the only one
+      // that existed at the time, rather than as "list unknown" (which
+      // would read as "moved" below and create a duplicate for every
+      // task that had already synced once).
+      const effectiveOldList = task.google_tasklist_id ?? (task.google_task_id ? defaultListId : null);
+
+      if (!task.google_task_id) {
+        const insertRes = await fetch(`${TASKS_API}/lists/${targetList}/tasks`, {
+          method: "POST",
+          headers: gHeaders,
+          body: JSON.stringify(body),
+        });
+        if (insertRes.ok) {
+          const created = (await insertRes.json()) as GTask;
+          task.google_task_id = created.id;
+          task.google_tasklist_id = targetList;
+          await supabase
+            .from("tasks")
+            .update({ google_task_id: created.id, google_tasklist_id: targetList })
+            .eq("id", task.id);
+        }
+      } else if (effectiveOldList === targetList) {
+        await fetch(`${TASKS_API}/lists/${targetList}/tasks/${task.google_task_id}`, {
+          method: "PATCH",
+          headers: gHeaders,
+          body: JSON.stringify(body),
+        });
+      } else {
+        // Category changed since the last sync — Tasks API has no
+        // cross-list move, so delete the old copy and recreate it.
+        if (effectiveOldList) {
+          await fetch(`${TASKS_API}/lists/${effectiveOldList}/tasks/${task.google_task_id}`, {
+            method: "DELETE",
+            headers: gHeaders,
+          }).catch(() => {});
+        }
+        const insertRes = await fetch(`${TASKS_API}/lists/${targetList}/tasks`, {
+          method: "POST",
+          headers: gHeaders,
+          body: JSON.stringify(body),
+        });
+        if (insertRes.ok) {
+          const created = (await insertRes.json()) as GTask;
+          task.google_task_id = created.id;
+          task.google_tasklist_id = targetList;
+          await supabase
+            .from("tasks")
+            .update({ google_task_id: created.id, google_tasklist_id: targetList })
+            .eq("id", task.id);
         }
       }
     }
