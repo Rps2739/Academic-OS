@@ -35,6 +35,7 @@ interface NewsItem {
   source: string | null;
   summary: string | null;
   published_at: string | null;
+  source_count: number;
 }
 
 const FEED_CATEGORIES = [
@@ -117,12 +118,26 @@ export function NewsView({ localDb, userId, onChanged, onNotify }: NewsViewProps
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeCategory, tab]);
 
+  // Keeps the tab you're actively viewing current without needing a manual
+  // refresh or a tab switch — loadCategory itself only actually re-fetches
+  // once STALE_MS has genuinely passed, so this just re-checks on the same
+  // cadence rather than forcing a fetch every tick.
+  useEffect(() => {
+    if (tab === "saved" || tab === "markets") return;
+    const interval = setInterval(() => void loadCategory(activeCategory, false), STALE_MS);
+    return () => clearInterval(interval);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeCategory, tab]);
+
   async function loadCategory(category: string, forceRefresh: boolean) {
     setLoading(true);
     setFailedFeeds([]);
     try {
+      // Cached rows are ranked the same way the server ranks a fresh fetch —
+      // by cross-source corroboration first, recency second — so switching
+      // tabs doesn't visibly re-order once a background refresh completes.
       const cached = await localDb.raw.select<Record<string, unknown>[]>(
-        "SELECT * FROM news_items_local WHERE category = $1 ORDER BY published_at DESC",
+        "SELECT * FROM news_items_local WHERE category = $1 ORDER BY source_count DESC, published_at DESC",
         [category]
       );
       setItems(cached as unknown as NewsItem[]);
@@ -141,7 +156,16 @@ export function NewsView({ localDb, userId, onChanged, onNotify }: NewsViewProps
       });
       if (error) throw error;
 
-      const freshItems = (data?.items ?? []) as NewsItem[];
+      interface RawNewsItem {
+        id: string;
+        title: string;
+        link: string;
+        source: string;
+        summary: string;
+        publishedAt: string;
+        sourceCount: number;
+      }
+      const freshItems = (data?.items ?? []) as RawNewsItem[];
       setFailedFeeds((data?.failedFeeds ?? []) as string[]);
 
       // Server already validates link scheme, but a defence-in-depth check
@@ -152,13 +176,24 @@ export function NewsView({ localDb, userId, onChanged, onNotify }: NewsViewProps
       await localDb.raw.execute("DELETE FROM news_items_local WHERE category = $1", [category]);
       for (const it of safeItems) {
         await localDb.raw.execute(
-          `INSERT INTO news_items_local (id, category, title, link, source, summary, published_at, fetched_at)
-           VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-           ON CONFLICT(id) DO UPDATE SET category=$2, title=$3, link=$4, source=$5, summary=$6, published_at=$7, fetched_at=$8`,
-          [it.id, category, it.title, it.link, it.source, it.summary, it.published_at, now]
+          `INSERT INTO news_items_local (id, category, title, link, source, summary, published_at, fetched_at, source_count)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+           ON CONFLICT(id) DO UPDATE SET category=$2, title=$3, link=$4, source=$5, summary=$6, published_at=$7, fetched_at=$8, source_count=$9`,
+          [it.id, category, it.title, it.link, it.source, it.summary, it.publishedAt, now, it.sourceCount]
         );
       }
-      setItems(safeItems.map((it) => ({ ...it, category })));
+      setItems(
+        safeItems.map((it) => ({
+          id: it.id,
+          category,
+          title: it.title,
+          link: it.link,
+          source: it.source,
+          summary: it.summary,
+          published_at: it.publishedAt,
+          source_count: it.sourceCount,
+        }))
+      );
     } catch (err) {
       console.error("news-fetch failed:", err);
       if (items.length === 0) {
@@ -272,6 +307,7 @@ export function NewsView({ localDb, userId, onChanged, onNotify }: NewsViewProps
             source: r["source"] as string | null,
             summary: r["summary"] as string | null,
             published_at: r["published_at"] as string | null,
+            source_count: 0, // not shown for saved items — no ranking needed on a list you chose yourself
           }) satisfies NewsItem
       ),
     [savedRows]
@@ -287,7 +323,14 @@ export function NewsView({ localDb, userId, onChanged, onNotify }: NewsViewProps
             if (safe) void openUrl(safe);
           }}
         >
-          <div className="news-item__title">{item.title}</div>
+          <div className="news-item__title-row">
+            <div className="news-item__title">{item.title}</div>
+            {item.source_count > 1 && (
+              <span className="news-item__corroboration" title={`${item.source_count} outlets are covering this story`}>
+                {item.source_count} sources
+              </span>
+            )}
+          </div>
           <div className="news-item__meta">
             {item.source ?? "Unknown source"}
             {item.published_at ? ` · ${relativeTime(item.published_at)}` : ""}

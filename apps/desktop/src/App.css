@@ -2324,7 +2324,15 @@ body.widget-window {
   padding: 0;
 }
 
+.news-item__title-row {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-2);
+}
+
 .news-item__title {
+  flex: 1;
+  min-width: 0;
   font-size: var(--text-md);
   font-weight: 600;
   color: var(--ink);
@@ -2333,6 +2341,19 @@ body.widget-window {
 
 .news-item__body:hover .news-item__title {
   color: var(--accent);
+}
+
+.news-item__corroboration {
+  flex-shrink: 0;
+  padding: 1px var(--space-2);
+  border-radius: var(--radius-full);
+  background: var(--accent-tint);
+  color: var(--accent);
+  font-size: 10px;
+  font-weight: 650;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  white-space: nowrap;
 }
 
 .news-item__meta {

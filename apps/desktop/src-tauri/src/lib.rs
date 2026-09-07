@@ -218,6 +218,15 @@ fn migrations() -> Vec<Migration> {
                 dirty INTEGER NOT NULL DEFAULT 0
             );
         ",
+    }, Migration {
+        // How many distinct curated outlets ran essentially the same story —
+        // the corroboration-based ranking signal computed by news-fetch.
+        version: 7,
+        description: "news_cache_source_count",
+        kind: MigrationKind::Up,
+        sql: "
+            ALTER TABLE news_items_local ADD COLUMN source_count INTEGER NOT NULL DEFAULT 1;
+        ",
     }]
 }
 

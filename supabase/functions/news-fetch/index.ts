@@ -15,6 +15,11 @@ export interface NewsItem {
   summary: string;
   publishedAt: string;
   category: string;
+  /** How many distinct curated sources are running essentially the same
+   * story. Plain RSS carries no view/share/engagement data, so this — cross-
+   * outlet corroboration — is the only honest "how big is this story"
+   * signal available. Used to rank within a category; not a virality metric. */
+  sourceCount: number;
 }
 
 const MAX_ITEMS = 60;
@@ -118,6 +123,7 @@ function parseFeed(xml: string, feed: Feed, category: string): NewsItem[] {
         summary: stripHtml(body).slice(0, SUMMARY_MAX_CHARS),
         publishedAt: parseDate(item["pubDate"]),
         category,
+        sourceCount: 1, // filled in for real once corroboration across feeds is known, below
       });
     }
   } else if (doc?.feed?.entry) {
@@ -134,6 +140,7 @@ function parseFeed(xml: string, feed: Feed, category: string): NewsItem[] {
         source: feed.source,
         summary: stripHtml(body).slice(0, SUMMARY_MAX_CHARS),
         publishedAt: parseDate(entry["published"] ?? entry["updated"]),
+        sourceCount: 1, // filled in for real once corroboration across feeds is known, below
         category,
       });
     }
@@ -239,20 +246,37 @@ Deno.serve(async (req) => {
       }
     });
 
+    // Corroboration: how many DISTINCT outlets ran essentially the same
+    // story. Plain RSS has no view/share/engagement numbers, so this is the
+    // only honest "how big is this story" signal available — not a
+    // virality metric, just cross-source agreement.
+    const normTitle = (t: string) => t.toLowerCase().replace(/[^a-z0-9]/g, "");
+    const sourcesByTitle = new Map<string, Set<string>>();
+    for (const item of items) {
+      const key = normTitle(item.title);
+      if (!sourcesByTitle.has(key)) sourcesByTitle.set(key, new Set());
+      sourcesByTitle.get(key)!.add(item.source);
+    }
+
     // Dedupe: by link first, then by a normalised title (Indian outlets
     // frequently syndicate identical PTI/ANI copy under slightly different headlines).
     const seenLinks = new Set<string>();
     const seenTitles = new Set<string>();
     const deduped: NewsItem[] = [];
     for (const item of items) {
-      const normTitle = item.title.toLowerCase().replace(/[^a-z0-9]/g, "");
-      if (seenLinks.has(item.link) || seenTitles.has(normTitle)) continue;
+      const key = normTitle(item.title);
+      if (seenLinks.has(item.link) || seenTitles.has(key)) continue;
       seenLinks.add(item.link);
-      seenTitles.add(normTitle);
-      deduped.push(item);
+      seenTitles.add(key);
+      deduped.push({ ...item, sourceCount: sourcesByTitle.get(key)?.size ?? 1 });
     }
 
-    deduped.sort((a, b) => new Date(b.publishedAt).getTime() - new Date(a.publishedAt).getTime());
+    // Rank by corroboration first (a story several outlets are covering
+    // outranks a single outlet's one-off piece), recency as the tiebreaker.
+    deduped.sort((a, b) => {
+      if (b.sourceCount !== a.sourceCount) return b.sourceCount - a.sourceCount;
+      return new Date(b.publishedAt).getTime() - new Date(a.publishedAt).getTime();
+    });
 
     return new Response(
       JSON.stringify({ items: deduped.slice(0, MAX_ITEMS), failedFeeds }),
