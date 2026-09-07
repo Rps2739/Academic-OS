@@ -59,6 +59,29 @@ type TabId = (typeof FEED_CATEGORIES)[number]["id"] | "saved" | "markets";
 
 const STALE_MS = 30 * 60 * 1000; // 30 minutes
 
+/** Sources with a known metered/soft paywall. Their headlines are fine to
+ * show (that's what RSS is for — outlets publish those openly), but the
+ * in-app reader does a plain server-side fetch with no cookies or session,
+ * which can sometimes pull full text past a soft meter that a real browser
+ * visit would have blocked. For these, skip extraction entirely and always
+ * open the real page instead, so the site's own paywall applies exactly as
+ * the publisher intends. See feeds.ts for the matching `source` strings —
+ * keep this list in sync if a feed's source name changes there.
+ * Deliberately NOT applied to headline display, bookmarking, or "Save to
+ * note" — only to whether clicking an article opens the reader panel. */
+const NO_READER_SOURCES = new Set([
+  "Mint",
+  "Mint Markets",
+  "Mint Economy",
+  "Business Standard",
+  "BusinessLine",
+  "BusinessLine Portfolio",
+  "BusinessLine Economy",
+  "Wired",
+  "MIT Technology Review",
+  "Foreign Policy",
+]);
+
 /** Feed content is untrusted input from the public internet — never hand a
  * raw feed-supplied link straight to the OS. Only http(s) links are opened. */
 function safeExternalUrl(raw: string): string | null {
@@ -298,6 +321,23 @@ export function NewsView({ localDb, userId, onChanged, onNotify }: NewsViewProps
     writeCustomFeeds(next);
   }
 
+  /** Opens the reader panel — unless the source is a known metered-paywall
+   * outlet (see NO_READER_SOURCES), in which case it goes straight to the
+   * real page instead, so that outlet's own paywall applies normally. */
+  function openArticle(item: NewsItem | { title: string; link: string; source: string | null; published_at: string | null }) {
+    if (item.source && NO_READER_SOURCES.has(item.source)) {
+      const safe = safeExternalUrl(item.link);
+      if (safe) void openUrl(safe);
+      return;
+    }
+    setReaderArticle({
+      title: item.title,
+      link: item.link,
+      source: item.source,
+      published_at: item.published_at,
+    });
+  }
+
   const savedItems = useMemo(
     () =>
       savedRows.map(
@@ -319,17 +359,7 @@ export function NewsView({ localDb, userId, onChanged, onNotify }: NewsViewProps
   function ArticleRow({ item, saved }: { item: NewsItem; saved: boolean }) {
     return (
       <div className={`news-item ${readerArticle?.link === item.link ? "news-item--open" : ""}`}>
-        <button
-          className="news-item__body"
-          onClick={() =>
-            setReaderArticle({
-              title: item.title,
-              link: item.link,
-              source: item.source,
-              published_at: item.published_at,
-            })
-          }
-        >
+        <button className="news-item__body" onClick={() => openArticle(item)}>
           <div className="news-item__title-row">
             <div className="news-item__title">{item.title}</div>
             {item.source_count > 1 && (
@@ -486,17 +516,7 @@ export function NewsView({ localDb, userId, onChanged, onNotify }: NewsViewProps
                       className={`news-item ${readerArticle?.link === item.link ? "news-item--open" : ""}`}
                       key={item.id}
                     >
-                      <button
-                        className="news-item__body"
-                        onClick={() =>
-                          setReaderArticle({
-                            title: item.title,
-                            link: item.link,
-                            source: item.source,
-                            published_at: item.published_at,
-                          })
-                        }
-                      >
+                      <button className="news-item__body" onClick={() => openArticle(item)}>
                         <div className="news-item__title">{item.title}</div>
                         <div className="news-item__meta">
                           {item.source ?? "Unknown source"}
