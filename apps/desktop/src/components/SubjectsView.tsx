@@ -13,6 +13,8 @@ import {
   Briefcase,
   Pencil,
   Trash2,
+  BadgeCheck,
+  CalendarOff,
 } from "lucide-react";
 
 interface SubjectsViewProps {
@@ -28,7 +30,7 @@ interface SessionRow {
   id: string;
   starts_at: string;
   subject_label: string;
-  attendance_state: "present" | "absent" | null;
+  attendance_state: "present" | "absent" | "od" | "cancelled" | null;
   attendance_mark_id: string | null;
 }
 
@@ -347,7 +349,7 @@ export function SubjectsView({ localDb, userId, onChanged, onOpenFolder, onGoToV
         id: s["id"] as string,
         starts_at: s["starts_at"] as string,
         subject_label: s["subject_label"] as string,
-        attendance_state: (mark?.["state"] as "present" | "absent" | undefined) ?? null,
+        attendance_state: (mark?.["state"] as "present" | "absent" | "od" | "cancelled" | undefined) ?? null,
         attendance_mark_id: (mark?.["id"] as string | undefined) ?? null,
       };
     });
@@ -392,7 +394,11 @@ export function SubjectsView({ localDb, userId, onChanged, onOpenFolder, onGoToV
     onOpenFolder(nodeId);
   }
 
-  async function markAttendance(subjectId: string, session: SessionRow, state: "present" | "absent") {
+  async function markAttendance(
+    subjectId: string,
+    session: SessionRow,
+    state: "present" | "absent" | "od" | "cancelled"
+  ) {
     // Toggling the same state again clears the mark (soft-delete) —
     // lets a misclick be undone without a separate "clear" control.
     const clearing = session.attendance_state === state;
@@ -420,9 +426,12 @@ export function SubjectsView({ localDb, userId, onChanged, onOpenFolder, onGoToV
   function attendancePct(subjectId: string): number | null {
     const rows = sessionsBySubject[subjectId];
     if (!rows) return null;
-    const marked = rows.filter((r) => r.attendance_state !== null);
+    // "cancelled" (the class didn't happen) counts toward neither side —
+    // excluded from the denominator entirely. "od" (on-duty) counts as
+    // present, per standard college attendance policy.
+    const marked = rows.filter((r) => r.attendance_state !== null && r.attendance_state !== "cancelled");
     if (marked.length === 0) return null;
-    const present = marked.filter((r) => r.attendance_state === "present").length;
+    const present = marked.filter((r) => r.attendance_state === "present" || r.attendance_state === "od").length;
     return Math.round((present / marked.length) * 100);
   }
 
@@ -596,6 +605,24 @@ export function SubjectsView({ localDb, userId, onChanged, onOpenFolder, onGoToV
                                   onClick={() => void markAttendance(subject.id as string, s, "absent")}
                                 >
                                   <XIcon size={12} strokeWidth={2.5} />
+                                </button>
+                                <button
+                                  className={`subject-session-row__mark subject-session-row__mark--od ${
+                                    s.attendance_state === "od" ? "subject-session-row__mark--active" : ""
+                                  }`}
+                                  title="Mark on-duty (OD) — counts as present"
+                                  onClick={() => void markAttendance(subject.id as string, s, "od")}
+                                >
+                                  <BadgeCheck size={12} strokeWidth={2.5} />
+                                </button>
+                                <button
+                                  className={`subject-session-row__mark subject-session-row__mark--cancelled ${
+                                    s.attendance_state === "cancelled" ? "subject-session-row__mark--active" : ""
+                                  }`}
+                                  title="Mark class cancelled — excluded from attendance %"
+                                  onClick={() => void markAttendance(subject.id as string, s, "cancelled")}
+                                >
+                                  <CalendarOff size={12} strokeWidth={2.5} />
                                 </button>
                               </div>
                             ))

@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import type { LocalRow } from "@academic-os/core";
 import { FileText, NotebookText, ListTodo, CalendarDays, Undo2, Home, BookOpen, Briefcase, Columns2, X, Newspaper } from "lucide-react";
 import { AuthGate } from "./components/AuthGate";
+import { ErrorBoundary } from "./components/ErrorBoundary";
 import { TreeSidebar } from "./components/TreeSidebar";
 import { PageEditor } from "./components/PageEditor";
 import { NoteOutline } from "./components/NoteOutline";
@@ -138,6 +139,7 @@ function MainLayout({ userId }: { userId: string }) {
           </button>
         ))}
       </nav>
+      <ErrorBoundary key={view}>
       {view === "home" ? (
         <main className="app-main app-main--home">
           <HomeView
@@ -262,6 +264,7 @@ function MainLayout({ userId }: { userId: string }) {
           <TimetableView localDb={localDb} userId={userId} onChanged={triggerSync} />
         </main>
       )}
+      </ErrorBoundary>
       {toast && (
         <div className="undo-toast" role="status">
           <span className="undo-toast__message">{toast.message}</span>

@@ -144,6 +144,32 @@ describe("sync engine — Phase 0 gate (design manual §7, §8 task 0.6)", () =>
     expect(bRow?.["blocks"]).toBe("B version");
   });
 
+  it("resolves a conflicting edit on a non-page_bodies table: newer server write wins, the local loser is archived to sync_conflicts, never destroyed", async () => {
+    const { remote, deviceA, deviceB } = freshWorld();
+
+    await deviceA.put("tasks", { id: "task-1", user_id: USER, title: "original", status: "open" });
+    await sync(deviceA, remote, "device-A");
+    await sync(deviceB, remote, "device-B");
+
+    // Simulates the real incident: gtasks-sync writes directly to Postgres
+    // (modelled here as device B syncing a change), while device A has an
+    // unrelated local edit in flight that hasn't been pushed yet.
+    await deviceB.put("tasks", { id: "task-1", user_id: USER, title: "original", status: "done" });
+    await deviceA.put("tasks", { id: "task-1", user_id: USER, title: "renamed locally", status: "open" });
+
+    await sync(deviceB, remote, "device-B");
+    await sync(deviceA, remote, "device-A"); // A is stale relative to the server -> conflict branch
+
+    const aRow = await deviceA.getLocal("tasks", "task-1");
+    expect(aRow?.["status"]).toBe("done");
+    expect(aRow?.dirty).toBe(false);
+
+    const conflicts = await deviceA.listSyncConflicts("tasks", "task-1");
+    expect(conflicts).toHaveLength(1);
+    expect((conflicts[0]?.local_row as Record<string, unknown>)?.["title"]).toBe("renamed locally");
+    expect(conflicts[0]?.device_id).toBe("device-A");
+  });
+
   it("propagates a soft delete as an ordinary field change", async () => {
     const { remote, deviceA, deviceB } = freshWorld();
 

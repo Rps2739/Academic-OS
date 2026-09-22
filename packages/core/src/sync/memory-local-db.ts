@@ -9,6 +9,15 @@ interface PageVersionEntry {
   created_at: string;
 }
 
+interface SyncConflictEntry {
+  table: TableName;
+  row_id: string;
+  local_row: unknown;
+  remote_row: unknown;
+  device_id: string;
+  created_at: string;
+}
+
 /**
  * Reference LocalDb implementation. Used directly in engine tests, and as
  * the model that the real tauri-plugin-sql / expo-sqlite adapters (Phase 1
@@ -18,6 +27,7 @@ export class InMemoryLocalDb implements LocalDb {
   private readonly tables = new Map<TableName, Map<string, LocalRow>>();
   private readonly meta = new Map<string, string>();
   private readonly pageVersions: PageVersionEntry[] = [];
+  private readonly syncConflicts: SyncConflictEntry[] = [];
 
   constructor(private readonly clock: Clock = systemClock) {
     for (const table of SYNC_TABLES) this.tables.set(table, new Map());
@@ -82,5 +92,19 @@ export class InMemoryLocalDb implements LocalDb {
 
   async listPageVersions(nodeId: string): Promise<PageVersionEntry[]> {
     return this.pageVersions.filter((v) => v.node_id === nodeId);
+  }
+
+  async appendSyncConflict(entry: {
+    table: TableName;
+    row_id: string;
+    local_row: unknown;
+    remote_row: unknown;
+    device_id: string;
+  }): Promise<void> {
+    this.syncConflicts.push({ ...entry, created_at: this.clock() });
+  }
+
+  async listSyncConflicts(table: TableName, rowId: string): Promise<SyncConflictEntry[]> {
+    return this.syncConflicts.filter((c) => c.table === table && c.row_id === rowId);
   }
 }

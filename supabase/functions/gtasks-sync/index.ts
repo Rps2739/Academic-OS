@@ -255,11 +255,16 @@ Deno.serve(async (req) => {
       }
 
       const targetList = await targetListFor(task);
+      // Explicit `null`, not `undefined` — Google's PATCH is a partial
+      // update where an OMITTED field means "leave unchanged", not "clear
+      // it" (JSON.stringify drops `undefined` keys entirely). Clearing a
+      // task's notes or due date locally was silently not propagating to
+      // Google for exactly this reason; `null` is what actually clears it.
       const body = {
         title: task.title,
-        notes: task.notes ?? undefined,
+        notes: task.notes ?? null,
         status: task.status === "done" ? "completed" : "needsAction",
-        due: task.due_at ? new Date(task.due_at).toISOString() : undefined,
+        due: task.due_at ? new Date(task.due_at).toISOString() : null,
       };
 
       // Tasks synced before this migration have google_task_id set but

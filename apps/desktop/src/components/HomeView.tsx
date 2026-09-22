@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import type { LocalRow } from "@academic-os/core";
 import type { SqliteLocalDb } from "../lib/sqlite-local-db";
-import { CalendarDays, ListTodo, FileText, Check, X as XIcon, ArrowRight } from "lucide-react";
+import { CalendarDays, ListTodo, FileText, Check, X as XIcon, ArrowRight, BadgeCheck, CalendarOff } from "lucide-react";
 import { relativeTime } from "../lib/format";
 
 interface HomeViewProps {
@@ -21,7 +21,7 @@ interface TodaySession {
   faculty: string | null;
   subject_id: string | null;
   attendance_id: string | null;
-  attendance_state: "present" | "absent" | null;
+  attendance_state: "present" | "absent" | "od" | "cancelled" | null;
 }
 
 function fmtTime(iso: string): string {
@@ -60,7 +60,7 @@ export function HomeView({ localDb, userId, onChanged, onOpenNote, onGoToView, r
           faculty: s["faculty"] as string | null,
           subject_id: s["subject_id"] as string | null,
           attendance_id: (mark?.["id"] as string | undefined) ?? null,
-          attendance_state: (mark?.["state"] as "present" | "absent" | undefined) ?? null,
+          attendance_state: (mark?.["state"] as "present" | "absent" | "od" | "cancelled" | undefined) ?? null,
         };
       })
     );
@@ -88,7 +88,7 @@ export function HomeView({ localDb, userId, onChanged, onOpenNote, onGoToView, r
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [refreshSignal]);
 
-  async function markAttendance(session: TodaySession, state: "present" | "absent") {
+  async function markAttendance(session: TodaySession, state: "present" | "absent" | "od" | "cancelled") {
     if (!session.subject_id) return;
     const clearing = session.attendance_state === state;
     if (session.attendance_id) {
@@ -156,6 +156,24 @@ export function HomeView({ localDb, userId, onChanged, onOpenNote, onGoToView, r
                         onClick={() => void markAttendance(s, "absent")}
                       >
                         <XIcon size={11} strokeWidth={2.5} />
+                      </button>
+                      <button
+                        className={`subject-session-row__mark subject-session-row__mark--od ${
+                          s.attendance_state === "od" ? "subject-session-row__mark--active" : ""
+                        }`}
+                        title="Mark on-duty (OD) — counts as present"
+                        onClick={() => void markAttendance(s, "od")}
+                      >
+                        <BadgeCheck size={11} strokeWidth={2.5} />
+                      </button>
+                      <button
+                        className={`subject-session-row__mark subject-session-row__mark--cancelled ${
+                          s.attendance_state === "cancelled" ? "subject-session-row__mark--active" : ""
+                        }`}
+                        title="Mark class cancelled — excluded from attendance %"
+                        onClick={() => void markAttendance(s, "cancelled")}
+                      >
+                        <CalendarOff size={11} strokeWidth={2.5} />
                       </button>
                     </span>
                   )}

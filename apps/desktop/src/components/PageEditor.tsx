@@ -1,4 +1,9 @@
-import { useCreateBlockNote } from "@blocknote/react";
+import {
+  useCreateBlockNote,
+  FormattingToolbar,
+  FormattingToolbarController,
+  getFormattingToolbarItems,
+} from "@blocknote/react";
 import { BlockNoteView } from "@blocknote/mantine";
 import type { Theme } from "@blocknote/mantine";
 import type { Block } from "@blocknote/core";
@@ -10,6 +15,18 @@ import type { LocalRow } from "@academic-os/core";
 import type { SqliteLocalDb } from "../lib/sqlite-local-db";
 import { sanitizeTablePasteHtml } from "../lib/sanitize-table-paste";
 import { readPref, writePref, type ReadingFont } from "../lib/reading-prefs";
+import { FormatPainterButton } from "./FormatPainterButton";
+
+/** Default toolbar items plus our own Format Painter button — BlockNote
+ * has no built-in one. `formattingToolbar={false}` on BlockNoteView (below)
+ * suppresses the default toolbar so this one renders instead. */
+function CustomFormattingToolbar() {
+  return (
+    <FormattingToolbar>
+      {[...getFormattingToolbarItems(), <FormatPainterButton key="formatPainterButton" />]}
+    </FormattingToolbar>
+  );
+}
 
 /** Matches the editor's chrome (menus, toolbars, selection) to the app's
  * own palette via CSS custom properties, so it doesn't fight BlockNote's
@@ -284,7 +301,9 @@ function PageEditorInner({
           </span>
         </div>
       </div>
-      <BlockNoteView editor={editor} theme={editorTheme} />
+      <BlockNoteView editor={editor} theme={editorTheme} formattingToolbar={false}>
+        <FormattingToolbarController formattingToolbar={CustomFormattingToolbar} />
+      </BlockNoteView>
     </div>
   );
 }

@@ -318,6 +318,13 @@ input {
   text-align: center;
 }
 
+.app-error-boundary__detail {
+  font-size: var(--text-sm);
+  color: var(--muted-2);
+  max-width: 480px;
+  font-family: monospace;
+}
+
 /* ============================================================
    Auth gate — sign-in screen
    ============================================================ */
@@ -2937,7 +2944,7 @@ body.widget-window {
 
 .home-session__subject {
   flex: 1;
-  min-width: 0;
+  min-width: 24px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -2945,7 +2952,16 @@ body.widget-window {
 }
 
 .home-session__faculty {
-  flex-shrink: 0;
+  /* Was flex-shrink: 0 with no truncation — fine with 2 attendance
+     buttons, but adding OD/Cancelled (4 buttons) made the row wider than
+     this card and pushed the attendance group past the card's edge
+     instead of anything giving way. This is the thing that gives way now. */
+  flex-shrink: 1;
+  min-width: 0;
+  max-width: 70px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
   color: var(--muted);
   font-size: var(--text-xs);
 }
@@ -2954,6 +2970,11 @@ body.widget-window {
   display: flex;
   gap: 2px;
   flex-shrink: 0;
+}
+
+.home-session__attendance .subject-session-row__mark {
+  width: 18px;
+  height: 18px;
 }
 
 .home-task__title {
@@ -3290,6 +3311,28 @@ body.widget-window {
   background: var(--danger);
   border-color: var(--danger);
   color: var(--on-danger);
+}
+
+.subject-session-row__mark--od:hover {
+  color: var(--warning);
+  border-color: var(--warning);
+}
+
+.subject-session-row__mark--cancelled:hover {
+  color: var(--muted-2);
+  border-color: var(--muted-2);
+}
+
+.subject-session-row__mark--od.subject-session-row__mark--active {
+  background: var(--warning);
+  border-color: var(--warning);
+  color: var(--ink);
+}
+
+.subject-session-row__mark--cancelled.subject-session-row__mark--active {
+  background: var(--muted-2);
+  border-color: var(--muted-2);
+  color: var(--surface);
 }
 
 .subjects-view__add {

@@ -28,9 +28,22 @@ function kindLabel(kind: string): string {
   return KIND_OPTIONS.find((k) => k.value === kind)?.label ?? kind;
 }
 
+/** yyyy-MM-dd for an ISO timestamp, local time — same helper as TaskList.tsx. */
+function toDateInputValue(iso: string): string {
+  const d = new Date(iso);
+  const offset = d.getTimezoneOffset();
+  return new Date(d.getTime() - offset * 60_000).toISOString().slice(0, 10);
+}
+
+/** A project is overdue only once its deadline *date* is strictly in the
+ * past — compared by calendar day, not raw instant. Deadlines are
+ * date-only (stored at UTC midnight), so an instant comparison wrongly
+ * flagged a project due *today* as overdue the moment local time passed
+ * that stored midnight (same bug already fixed in TaskList.tsx's
+ * isOverdue — this reintroduced it). */
 function isOverdue(deadline: string | null, status: string): boolean {
   if (!deadline || status !== "active") return false;
-  return new Date(deadline).getTime() < Date.now();
+  return toDateInputValue(deadline) < toDateInputValue(new Date().toISOString());
 }
 
 /**

@@ -10,8 +10,16 @@ async function getOrCreateFolder(accessToken: string, name: string, parentId: st
   // letting the rest of the crafted name run as unquoted query syntax.
   const escapedName = name.replace(/\\/g, "\\\\").replace(/'/g, "\\'");
   const q = `name = '${escapedName}' and mimeType = 'application/vnd.google-apps.folder' and trashed = false and ${parentClause}`;
+  // orderBy=createdTime matters: this is a check-then-create with no
+  // locking (Drive has no atomic "create if missing"), so two uploads
+  // racing to resolve the same not-yet-existing path segment can both
+  // list-see-nothing and both create a folder. That duplicate can't be
+  // prevented here, but ordering by creation time means every future
+  // lookup deterministically converges on the same (oldest) folder
+  // instead of nondeterministically picking whichever Drive returns
+  // first — so uploads don't keep silently splitting across both.
   const listRes = await fetch(
-    `https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(q)}&fields=files(id)&pageSize=1`,
+    `https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(q)}&fields=files(id)&orderBy=createdTime&pageSize=1`,
     { headers: { Authorization: `Bearer ${accessToken}` } }
   );
   if (!listRes.ok) throw new Error(`Drive folder lookup failed: ${await listRes.text()}`);

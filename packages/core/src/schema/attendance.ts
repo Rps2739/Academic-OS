@@ -1,13 +1,16 @@
 import { z } from "zod";
 import { syncableBase } from "./base";
 
-export const attendanceState = z.enum(["present", "absent"]);
+export const attendanceState = z.enum(["present", "absent", "od", "cancelled"]);
 export type AttendanceState = z.infer<typeof attendanceState>;
 
 /**
- * A manual ledger — Present/Absent per session, typed in by hand. Moodle
- * remains the official record; this is only the user's own running tally.
- * No forecasting, no on-duty state, no Moodle integration. See §8 Phase 6.
+ * A manual ledger — Present/Absent/OD/Cancelled per session, typed in by
+ * hand. Moodle remains the official record; this is only the user's own
+ * running tally. No Moodle integration. "od" (on-duty) counts as present
+ * for the attendance %; "cancelled" (the class didn't happen) is excluded
+ * from both numerator and denominator — see attendancePct in
+ * SubjectsView.tsx/HomeView.tsx.
  */
 export const attendanceMarkSchema = syncableBase.extend({
   subject_id: z.string().uuid(),

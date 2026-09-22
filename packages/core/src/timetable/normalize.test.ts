@@ -18,7 +18,15 @@ const REVISED = path.join(
   SAMPLES_DIR,
   "Revised - Timetable 11). 31st August  to 5th September  2026 MBA(BA) Sem-3 -  (Batch 2025-27) (1).xlsx"
 );
+// Shipped with two extra rows above the slot-header block compared to
+// every other week's file — the real-world case that broke the old
+// fixed-row assumptions (see findSlotHeaderRow in normalize.ts).
+const SHIFTED_ROWS = path.join(
+  SAMPLES_DIR,
+  "Timetable 14). 21st September  to 26th September 2026 MBA(BA) Sem-3 -  (Batch 2025-27).xlsx"
+);
 const haveFixtures = existsSync(ORIGINAL) && existsSync(REVISED);
+const haveShiftedFixture = existsSync(SHIFTED_ROWS);
 
 describe.skipIf(!haveFixtures)("parseTimetableWorkbook (real fixtures)", () => {
   function load(filePath: string) {
@@ -82,6 +90,20 @@ describe.skipIf(!haveFixtures)("parseTimetableWorkbook (real fixtures)", () => {
     expect(added.map((s) => s.subjectLabel).sort()).toEqual(["CBD (JS)", "CBD (JS)"]);
     expect(added.every((s) => s.startsAt.startsWith("2026-08-31"))).toBe(true);
     expect(added.every((s) => s.faculty === "Prof Joydeep Sen")).toBe(true);
+  });
+});
+
+describe.skipIf(!haveShiftedFixture)("parseTimetableWorkbook (row-shifted real fixture)", () => {
+  function load(filePath: string) {
+    const buf = readFileSync(filePath);
+    return parseTimetableWorkbook(buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength));
+  }
+
+  it("finds the slot-header row by content instead of a fixed offset, and resolves the correct week", () => {
+    const result = load(SHIFTED_ROWS);
+    expect(result.weekStart).toBe("2026-09-21");
+    expect(result.warnings).toEqual([]);
+    expect(result.sessions.length).toBeGreaterThan(0);
   });
 });
 

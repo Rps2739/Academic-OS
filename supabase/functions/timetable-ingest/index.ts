@@ -189,17 +189,33 @@ Deno.serve(async (req) => {
       // Best-effort, same as the Drive upload — the import itself has
       // already succeeded and must not be undone by a Calendar hiccup.
       // This is what makes new sessions show up in Calendar without the
-      // desktop app needing to be open (gcal-sync only runs while it is).
-      try {
-        // Fetched fresh rather than reusing the Drive-upload token above
-        // — that one is scoped to the `if (!driveFileId)` branch and
-        // may not have run this call (a retry reusing an existing
-        // driveFileId skips it entirely). Access tokens are cheap and
-        // short-lived by design, so no reason to thread it through.
-        const calendarAccessToken = await getGoogleAccessToken();
-        await syncClassSessionsToCalendar(supabase, userId, calendarAccessToken);
-      } catch (err) {
-        console.error("Calendar sync failed after ingest:", err);
+      // desktop app needing to be open (gcal-sync only runs while it is;
+      // if the app happens to be closed when the hourly watcher runs, this
+      // is the ONLY thing that reaches the phone/other devices promptly).
+      // A couple of retries here is safe to repeat blindly:
+      // syncClassSessionsToCalendar is idempotent — it only creates events
+      // for sessions still missing a gcal_event_id and only deletes ones
+      // it can see are cancelled/superseded, so re-running after a partial
+      // failure just picks up where it left off rather than double-booking.
+      let calendarSynced = false;
+      let lastCalendarErr: unknown;
+      for (let attempt = 1; attempt <= 3 && !calendarSynced; attempt++) {
+        try {
+          // Fetched fresh rather than reusing the Drive-upload token above
+          // — that one is scoped to the `if (!driveFileId)` branch and
+          // may not have run this call (a retry reusing an existing
+          // driveFileId skips it entirely). Access tokens are cheap and
+          // short-lived by design, so no reason to thread it through.
+          const calendarAccessToken = await getGoogleAccessToken();
+          await syncClassSessionsToCalendar(supabase, userId, calendarAccessToken);
+          calendarSynced = true;
+        } catch (err) {
+          lastCalendarErr = err;
+          if (attempt < 3) await new Promise((resolve) => setTimeout(resolve, attempt * 1500));
+        }
+      }
+      if (!calendarSynced) {
+        console.error("Calendar sync failed after ingest (3 attempts):", lastCalendarErr);
       }
     }
 

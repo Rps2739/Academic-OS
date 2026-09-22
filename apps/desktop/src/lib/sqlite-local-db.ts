@@ -178,6 +178,44 @@ export class SqliteLocalDb implements LocalDb {
     return rows.map((r) => ({ ...r, blocks: JSON.parse(r.blocks) as unknown }));
   }
 
+  async appendSyncConflict(entry: {
+    table: TableName;
+    row_id: string;
+    local_row: unknown;
+    remote_row: unknown;
+    device_id: string;
+  }): Promise<void> {
+    await this.db.execute(
+      "INSERT INTO sync_conflicts_local (id, table_name, row_id, local_row, remote_row, device_id, created_at) VALUES ($1, $2, $3, $4, $5, $6, $7)",
+      [
+        crypto.randomUUID(),
+        entry.table,
+        entry.row_id,
+        JSON.stringify(entry.local_row),
+        JSON.stringify(entry.remote_row),
+        entry.device_id,
+        new Date().toISOString(),
+      ]
+    );
+  }
+
+  async listSyncConflicts(table: TableName, rowId: string) {
+    const rows = await this.db.select<
+      Array<{ table_name: TableName; row_id: string; local_row: string; remote_row: string; device_id: string; created_at: string }>
+    >(
+      "SELECT table_name, row_id, local_row, remote_row, device_id, created_at FROM sync_conflicts_local WHERE table_name = $1 AND row_id = $2 ORDER BY created_at DESC",
+      [table, rowId]
+    );
+    return rows.map((r) => ({
+      table: r.table_name,
+      row_id: r.row_id,
+      local_row: JSON.parse(r.local_row) as unknown,
+      remote_row: JSON.parse(r.remote_row) as unknown,
+      device_id: r.device_id,
+      created_at: r.created_at,
+    }));
+  }
+
   /** Direct children of a folder (or top-level nodes, when parentId is null), ordered for display. */
   async listChildren(parentId: string | null): Promise<LocalRow[]> {
     const rows =

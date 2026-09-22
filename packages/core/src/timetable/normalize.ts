@@ -35,7 +35,6 @@ import type { RawGrid } from "../schema/timetable";
  */
 
 const SLOT_HEADER_ROW = 6;
-const FIRST_DAY_HEADER_ROW = 7;
 const DAY_BLOCK_HEIGHT = 6;
 const DAY_COUNT = 6; // Mon-Sat
 const SLOT_ANCHOR_COLS = [1, 3, 5, 8, 10, 12];
@@ -119,6 +118,15 @@ function cellText(grid: RawGrid, r: number, c: number): string {
   return v === null || v === undefined ? "" : String(v).trim();
 }
 
+/** The legend table and the day-grid cells don't always agree on spacing
+ * around the parenthesis in a short name (e.g. legend "CBD (JS)" vs a
+ * grid cell "CBD( JS)") — collapsing all whitespace before comparing
+ * makes the legend/faculty lookup robust to that instead of silently
+ * missing the match and leaving faculty blank. */
+function normalizeShortName(name: string): string {
+  return name.replace(/\s+/g, "");
+}
+
 /** Monday-Saturday for the ISO week containing this date. */
 function mondayOf(date: Date): Date {
   const d = new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()));
@@ -130,6 +138,26 @@ function mondayOf(date: Date): Date {
 
 function toISODate(d: Date): string {
   return d.toISOString().slice(0, 10);
+}
+
+/**
+ * Locates the slot-header row by content ("Date" in column 0) instead of
+ * trusting the usual fixed row number — the 21st September 2026 sheet
+ * shipped with two extra rows above this block (everything below it
+ * shifted down to match), which silently broke every fixed-row
+ * assumption at once: the slot-time header read as blank, every
+ * session's time range failed to resolve, AND the week-anchor date cell
+ * (one row below the slot header) read the title text instead of a
+ * date, falling back to "today" for weekStart. Searching for the "Date"
+ * text — the same anchor-by-content approach already used below for the
+ * course legend table — survives the next time a row gets inserted
+ * upstream instead of breaking the same way again.
+ */
+function findSlotHeaderRow(grid: RawGrid): number {
+  for (let r = 0; r < grid.length; r++) {
+    if (cellText(grid, r, DATE_COL).toLowerCase() === "date") return r;
+  }
+  return SLOT_HEADER_ROW; // defensive fallback — keeps old behavior for a grid with no literal "Date" cell
 }
 
 /**
@@ -147,6 +175,8 @@ export function normalizeTimetableGrid(
   const warnings: string[] = [];
   const mergeIndex = buildMergeIndex(merges);
   const weekStart = mondayOf(weekStartHint ?? new Date());
+  const slotHeaderRow = findSlotHeaderRow(grid);
+  const firstDayHeaderRow = slotHeaderRow + 1;
 
   // Legend: Course Name (col 0) | Short Name (col 2) | Faculty Name (col 3),
   // starting the row after "Course Name" appears in column 0.
@@ -156,7 +186,7 @@ export function normalizeTimetableGrid(
       for (let lr = r + 1; lr < grid.length; lr++) {
         const shortName = cellText(grid, lr, 2);
         if (!shortName) break;
-        legendByShortName.set(shortName.trim(), { faculty: cellText(grid, lr, 3) || "" });
+        legendByShortName.set(normalizeShortName(shortName), { faculty: cellText(grid, lr, 3) || "" });
       }
       break;
     }
@@ -165,8 +195,8 @@ export function normalizeTimetableGrid(
   // Slot time ranges, from the merged header row.
   const slotTimes = new Map<number, TimeRange>();
   for (const col of SLOT_ANCHOR_COLS) {
-    const merge = mergeIndex.get(SLOT_HEADER_ROW * 1000 + col);
-    const label = cellText(grid, SLOT_HEADER_ROW, merge?.s.c ?? col);
+    const merge = mergeIndex.get(slotHeaderRow * 1000 + col);
+    const label = cellText(grid, slotHeaderRow, merge?.s.c ?? col);
     const range = parseTimeLabel(label);
     if (range) slotTimes.set(col, range);
     else warnings.push(`Could not parse time label at column ${col}: "${label}"`);
@@ -175,7 +205,7 @@ export function normalizeTimetableGrid(
   const sessions: ParsedSession[] = [];
 
   for (let day = 0; day < DAY_COUNT; day++) {
-    const headerRow = FIRST_DAY_HEADER_ROW + day * DAY_BLOCK_HEIGHT;
+    const headerRow = firstDayHeaderRow + day * DAY_BLOCK_HEIGHT;
     const dataRow = headerRow + 1;
     const dayDate = new Date(weekStart);
     dayDate.setUTCDate(dayDate.getUTCDate() + day);
@@ -212,7 +242,7 @@ export function normalizeTimetableGrid(
       const sessionMatch = value.match(/^(.+?)\s*-\s*(\d+)$/);
       const rawLabel = sessionMatch?.[1]?.trim() ?? value;
       const sessionNumber = sessionMatch?.[2] ?? null;
-      const legend = legendByShortName.get(rawLabel);
+      const legend = legendByShortName.get(normalizeShortName(rawLabel));
       if (sessionMatch && !legend) {
         warnings.push(`"${rawLabel}" on ${dateStr} has no matching row in the course legend`);
       }
@@ -267,7 +297,13 @@ export function parseTimetableWorkbook(data: ArrayBuffer): ParseResult {
   }) as RawGrid;
   const merges = (sheet["!merges"] ?? []) as CellMerge[];
 
-  const dateCell = sheet[XLSX.utils.encode_cell({ r: FIRST_DAY_HEADER_ROW, c: DATE_COL })];
+  // Same dynamic anchor as normalizeTimetableGrid — must agree with it on
+  // which row the first day-block actually starts on, or this reads the
+  // wrong cell (previously: the fixed row landed on the title text
+  // instead of a date, which fails the `typeof === "number"` check
+  // silently and falls back to "today" as the week-anchor with no warning).
+  const firstDayHeaderRow = findSlotHeaderRow(grid) + 1;
+  const dateCell = sheet[XLSX.utils.encode_cell({ r: firstDayHeaderRow, c: DATE_COL })];
   let weekStartHint: Date | undefined;
   if (dateCell && typeof dateCell.v === "number") {
     const parsed = XLSX.SSF.parse_date_code(dateCell.v);

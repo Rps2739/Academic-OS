@@ -6,7 +6,8 @@ interface Heading { id: string; level: number; text: string }
 interface Highlight { id: string; text: string; color: string }
 
 function inlineText(block: Block): string {
-  return ((block.content ?? []) as Array<{ text?: string } | string>)
+  if (!Array.isArray(block.content)) return "";
+  return (block.content as Array<{ text?: string } | string>)
     .map((c) => (typeof c === "string" ? c : (c as { text?: string }).text ?? ""))
     .join("");
 }
@@ -17,9 +18,16 @@ function walk(blocks: Block[], headings: Heading[], highlights: Highlight[]): vo
       const text = inlineText(b);
       if (text) headings.push({ id: b.id, level: (b.props as { level?: number }).level ?? 1, text });
     }
-    for (const c of (b.content ?? []) as Array<{ styles?: { backgroundColor?: string }; text?: string }>) {
-      const bg = c?.styles?.backgroundColor;
-      if (bg && c.text) highlights.push({ id: b.id, text: c.text, color: bg });
+    // Only inline-content blocks (paragraph, heading, list items, …) carry
+    // an array here — table blocks carry a {rows: […]} object instead
+    // (rowspan/colspan grid, not a flat list), which used to throw
+    // "object is not iterable" and crash the whole window on any note
+    // containing a table (see LEARNING.md/CLAUDE.md incident notes).
+    if (Array.isArray(b.content)) {
+      for (const c of b.content as Array<{ styles?: { backgroundColor?: string }; text?: string }>) {
+        const bg = c?.styles?.backgroundColor;
+        if (bg && c.text) highlights.push({ id: b.id, text: c.text, color: bg });
+      }
     }
     if ((b as { children?: Block[] }).children?.length) {
       walk((b as { children: Block[] }).children, headings, highlights);

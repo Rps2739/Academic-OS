@@ -49,7 +49,10 @@ export interface LocalDb {
   getMeta(key: string): Promise<string | undefined>;
   setMeta(key: string, value: string): Promise<void>;
 
-  /** The safety net: a losing edit is archived here, never discarded. */
+  /**
+   * The safety net for page_bodies specifically: a losing edit is archived
+   * here (with full version history, browsable per node), never discarded.
+   */
   appendPageVersion(entry: {
     node_id: string;
     blocks: unknown;
@@ -58,6 +61,25 @@ export interface LocalDb {
   }): Promise<void>;
   listPageVersions(nodeId: string): Promise<
     Array<{ node_id: string; blocks: unknown; markdown: string | null; device_id: string; created_at: string }>
+  >;
+
+  /**
+   * The safety net for every OTHER table: page_bodies is the only table
+   * with its own version-history mechanism above, so every other table's
+   * losing edit in a conflict used to be silently destroyed by
+   * applyRemote() with zero trace. This is the generic fallback — not a
+   * full version history, just enough to recover a specific lost edit by
+   * hand if it's ever reported as "my change disappeared."
+   */
+  appendSyncConflict(entry: {
+    table: TableName;
+    row_id: string;
+    local_row: unknown;
+    remote_row: unknown;
+    device_id: string;
+  }): Promise<void>;
+  listSyncConflicts(table: TableName, rowId: string): Promise<
+    Array<{ table: TableName; row_id: string; local_row: unknown; remote_row: unknown; device_id: string; created_at: string }>
   >;
 }
 

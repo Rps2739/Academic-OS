@@ -227,6 +227,23 @@ fn migrations() -> Vec<Migration> {
         sql: "
             ALTER TABLE news_items_local ADD COLUMN source_count INTEGER NOT NULL DEFAULT 1;
         ",
+    }, Migration {
+        // Local-only safety net (never synced, same pattern as
+        // page_versions_local): every sync-conflict resolution outside
+        // page_bodies used to just silently overwrite the losing local
+        // edit with nothing kept. This gives it somewhere to land instead
+        // of vanishing — see packages/core/src/sync/engine.ts.
+        version: 8,
+        description: "sync_conflicts_local",
+        kind: MigrationKind::Up,
+        sql: "
+            CREATE TABLE sync_conflicts_local (
+                id TEXT PRIMARY KEY, table_name TEXT NOT NULL, row_id TEXT NOT NULL,
+                local_row TEXT NOT NULL, remote_row TEXT NOT NULL,
+                device_id TEXT NOT NULL, created_at TEXT NOT NULL
+            );
+            CREATE INDEX idx_sync_conflicts_row ON sync_conflicts_local (table_name, row_id);
+        ",
     }]
 }
 

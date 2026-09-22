@@ -54,13 +54,27 @@ async function pull(local: LocalDb, remote: RemoteDb, deviceId: string): Promise
         }
 
         // Conflict: this device has an unpushed edit AND the server has a
-        // newer version (someone else's sync landed first).
+        // newer version (someone else's sync landed first). applyRemote()
+        // below does a full-row overwrite, so whichever side loses here
+        // would otherwise vanish with zero trace — every table gets a
+        // safety net, not just page_bodies (see the 2026-09-12 incident:
+        // gtasks-sync and timetable-ingest both write directly to Postgres
+        // outside this engine, on tables a local edit can easily be
+        // in-flight on at the same time).
         if (remoteRow.updated_at > localRow.updated_at) {
           if (table === "page_bodies") {
             await local.appendPageVersion({
               node_id: localRow.id,
               blocks: localRow["blocks"],
               markdown: (localRow["markdown"] as string | null) ?? null,
+              device_id: deviceId,
+            });
+          } else {
+            await local.appendSyncConflict({
+              table,
+              row_id: localRow.id,
+              local_row: localRow,
+              remote_row: remoteRow,
               device_id: deviceId,
             });
           }
