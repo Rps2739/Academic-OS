@@ -6,7 +6,7 @@ import {
 } from "@blocknote/react";
 import { BlockNoteView } from "@blocknote/mantine";
 import type { Theme } from "@blocknote/mantine";
-import type { Block } from "@blocknote/core";
+import type { Block, BlockNoteEditor } from "@blocknote/core";
 import "@blocknote/core/fonts/inter.css";
 import "@blocknote/mantine/style.css";
 import { useEffect, useRef, useState } from "react";
@@ -16,6 +16,28 @@ import type { SqliteLocalDb } from "../lib/sqlite-local-db";
 import { sanitizeTablePasteHtml } from "../lib/sanitize-table-paste";
 import { readPref, writePref, type ReadingFont } from "../lib/reading-prefs";
 import { FormatPainterButton } from "./FormatPainterButton";
+import { imageFileToDataUrl, isImageFile, isImageOnlyHtml, stripEmbeddedImages } from "../lib/image-embed";
+
+/** Inserts each pasted image as an image block at the cursor — replacing
+ * the current block if it's an empty paragraph, same as BlockNote's own
+ * file-paste placement. */
+async function insertImageFiles(ed: BlockNoteEditor<any, any, any>, files: File[]) {
+  let reference = ed.getTextCursorPosition().block;
+  for (const file of files) {
+    let url: string;
+    try {
+      url = await imageFileToDataUrl(file);
+    } catch (err) {
+      window.alert(err instanceof Error ? err.message : String(err));
+      continue;
+    }
+    const imageBlock = { type: "image", props: { url, name: file.name } };
+    reference =
+      Array.isArray(reference.content) && reference.content.length === 0
+        ? ed.updateBlock(reference, imageBlock)
+        : ed.insertBlocks([imageBlock], reference, "after")[0];
+  }
+}
 
 /** Default toolbar items plus our own Format Painter button — BlockNote
  * has no built-in one. `formattingToolbar={false}` on BlockNoteView (below)
@@ -125,7 +147,26 @@ function PageEditorInner({
             }
           }
         }
+        const imageFiles = Array.from(event.clipboardData?.files ?? []).filter(isImageFile);
+        if (imageFiles.length > 0 && (!html || isImageOnlyHtml(html))) {
+          void insertImageFiles(ed, imageFiles);
+          return true;
+        }
         return defaultPasteHandler();
+      },
+      // BlockNote routes file-only pastes, drag-and-drop, and the image
+      // block's own "Upload" tab through this — without it, all three
+      // silently did nothing. Images become inline data: URLs (see
+      // image-embed.ts for why). Other file types belong in the
+      // Attachments rail (Drive-backed), not inside the note body.
+      uploadFile: async (file, blockId) => {
+        if (isImageFile(file)) return imageFileToDataUrl(file);
+        window.alert(`"${file.name}" isn't an image — add it from the Attachments panel below the note instead.`);
+        // BlockNote already inserted an empty placeholder block for this
+        // file and updates it with whatever we return, so return normally
+        // and remove the placeholder on the next tick.
+        if (blockId) setTimeout(() => editor.removeBlocks([blockId]), 0);
+        return "";
       },
     },
     [node.id]
@@ -232,7 +273,7 @@ function PageEditorInner({
     dirtyRef.current = false;
     if (!opts?.silent) setSaveState("saving");
     const blocks = editor.document;
-    const markdown = await editor.blocksToMarkdownLossy(blocks);
+    const markdown = stripEmbeddedImages(await editor.blocksToMarkdownLossy(blocks));
     // A rough plaintext derivation for full-text search (task 1.8) —
     // strips common markdown punctuation, not a full parser.
     const plaintext = markdown.replace(/[#*_`>[\]()-]/g, " ").replace(/\s+/g, " ").trim();

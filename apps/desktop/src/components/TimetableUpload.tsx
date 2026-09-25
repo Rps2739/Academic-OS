@@ -110,12 +110,15 @@ export function TimetableUpload({ localDb, userId, onChanged }: TimetableUploadP
         return;
       }
 
-      // Supersede whatever was previously scheduled for this week —
+      // Supersede the previous timetable's sessions for this week —
       // simple and correct for the desktop path; per-session diffing
       // (a precise "3 classes changed" notification) is the Edge
-      // Function's job (§4.5), not this one.
+      // Function's job (§4.5), not this one. Timetable-sourced rows only
+      // (import_id set): classes added by hand and events pulled from
+      // Google Calendar survive a new timetable, since superseded
+      // sessions get their Calendar events deleted.
       const previous = await localDb.raw.select<{ id: string }[]>(
-        "SELECT id FROM class_sessions WHERE week_start = $1 AND status = 'scheduled' AND deleted_at IS NULL",
+        "SELECT id FROM class_sessions WHERE week_start = $1 AND status = 'scheduled' AND import_id IS NOT NULL AND deleted_at IS NULL",
         [result.weekStart]
       );
       for (const row of previous) {

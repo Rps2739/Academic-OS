@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import type { LocalRow } from "@academic-os/core";
 import type { SqliteLocalDb } from "../lib/sqlite-local-db";
+import { autoLinkSessions, loadSubjectIndex, resolveSubjectId, subjectKey } from "../lib/subject-link";
 import {
   BookOpen,
   ChevronDown,
@@ -85,7 +86,10 @@ export function SubjectsView({ localDb, userId, onChanged, onOpenFolder, onGoToV
   }
 
   useEffect(() => {
-    void refresh();
+    void (async () => {
+      if ((await autoLinkSessions(localDb)) > 0) onChanged();
+      await refresh();
+    })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -136,17 +140,17 @@ export function SubjectsView({ localDb, userId, onChanged, onOpenFolder, onGoToV
         [discoverySince]
       );
 
-      const existing = await localDb.raw.select<Record<string, unknown>[]>(
-        "SELECT * FROM subjects WHERE deleted_at IS NULL"
-      );
-      const known = new Map<string, string>(); // lowercased name/alias -> subject id
-      for (const s of existing) {
-        const id = s["id"] as string;
-        known.set((s["name"] as string).toLowerCase(), id);
-        for (const alias of (s["aliases"] as string[] | null) ?? []) known.set(alias.toLowerCase(), id);
-      }
-
-      const toCreate = distinct.filter((row) => !known.has(row.subject_label.toLowerCase()));
+      // Same resolver the automatic linking uses — so a loosely-written
+      // label ("CBD( JS)", "PM( HM) @ Classroom 101", a bare "ML") matches
+      // its existing subject instead of being proposed as a new one.
+      const index = await loadSubjectIndex(localDb);
+      const seen = new Set<string>();
+      const toCreate = distinct.filter((row) => {
+        const key = subjectKey(row.subject_label);
+        if (resolveSubjectId(row.subject_label, row.faculty, index) || seen.has(key)) return false;
+        seen.add(key);
+        return true;
+      });
 
       // Ask which semester any newly-discovered subjects belong to, so
       // they don't land bucketed with an older semester's subjects that
@@ -165,7 +169,7 @@ export function SubjectsView({ localDb, userId, onChanged, onOpenFolder, onGoToV
 
       let created = 0;
       for (const row of toCreate) {
-        const key = row.subject_label.toLowerCase();
+        const key = subjectKey(row.subject_label);
         const id = crypto.randomUUID();
         await localDb.put("subjects", {
           id,
@@ -176,22 +180,15 @@ export function SubjectsView({ localDb, userId, onChanged, onOpenFolder, onGoToV
           node_id: null,
           aliases: [row.subject_label],
         });
-        known.set(key, id);
+        index.keys.set(key, id);
         created++;
       }
 
       // Backfill: every session whose label now resolves to a known
-      // subject but doesn't have subject_id set yet gets it filled in.
-      const unresolved = await localDb.raw.select<{ id: string; subject_label: string }[]>(
-        "SELECT id, subject_label FROM class_sessions WHERE deleted_at IS NULL AND subject_id IS NULL"
-      );
-      let linked = 0;
-      for (const session of unresolved) {
-        const subjectId = known.get(session.subject_label.toLowerCase());
-        if (!subjectId) continue;
-        await localDb.put("class_sessions", { id: session.id, user_id: userId, subject_id: subjectId });
-        linked++;
-      }
+      // subject but doesn't have subject_id set yet gets it filled in —
+      // all history here (this is the explicit button), unlike the
+      // automatic pass on load, which only looks at the current semester.
+      const linked = await autoLinkSessions(localDb, index, new Date(0).toISOString());
 
       await refresh();
       onChanged();

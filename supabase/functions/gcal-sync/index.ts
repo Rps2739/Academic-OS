@@ -1,11 +1,11 @@
-// Periodic Calendar push, called by the desktop app's sync loop while
-// it's running (design manual §4.6-§4.8). Covers sessions added or
-// edited outside the automated ingest path — a manual timetable upload,
-// or a class added by hand in the ClassesWidget. The automated ingest
-// path (timetable-ingest) also calls syncClassSessionsToCalendar
+// Periodic two-way Calendar sync, called by the desktop app's sync loop
+// every 2 minutes while it's running (design manual §4.6-§4.8): pulls
+// events the user adds/edits/deletes in the app's own "Academic OS —
+// Classes" Google Calendar into class_sessions, and pushes the app's own
+// creates/edits/deletes back (see _shared/calendar.ts). The automated
+// ingest path (timetable-ingest) also calls syncClassSessionsToCalendar
 // directly after creating sessions, so Calendar stays current even when
-// the desktop app isn't open; this function is the app-open path for
-// everything else.
+// the desktop app isn't open.
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.114.0";
 import { corsHeaders } from "../_shared/cors.ts";
 import { getGoogleAccessToken } from "../_shared/google-oauth.ts";

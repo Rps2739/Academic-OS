@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import type { LocalRow } from "@academic-os/core";
 import type { SqliteLocalDb } from "../lib/sqlite-local-db";
 import { SearchBox } from "./SearchBox";
+import { readExpandedFolders, writeExpandedFolders } from "../lib/reading-prefs";
 import { Folder, FolderPlus, FileText, FilePlus, ChevronRight, Trash2, Columns2 } from "lucide-react";
 
 interface TreeSidebarProps {
@@ -25,9 +26,16 @@ function parentKey(parentId: string | null): string {
 
 export function TreeSidebar({ localDb, userId, selectedId, onSelect, onChanged, onNodesDeleted, onNotify, refreshSignal, focusRequest, onOpenInSplit }: TreeSidebarProps) {
   const [childrenByParent, setChildrenByParent] = useState<Record<string, LocalRow[]>>({});
-  const [expanded, setExpanded] = useState<Set<string>>(new Set());
+  // Restored on mount so the mount effect below reloads every previously
+  // open folder's children — the tree is unmounted whenever another view
+  // is shown, and used to come back fully collapsed every time.
+  const [expanded, setExpanded] = useState<Set<string>>(readExpandedFolders);
   const expandedRef = useRef(expanded);
   expandedRef.current = expanded;
+
+  useEffect(() => {
+    writeExpandedFolders(expanded);
+  }, [expanded]);
 
   const loadChildren = useCallback(
     async (parentId: string | null) => {

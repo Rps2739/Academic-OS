@@ -3,6 +3,8 @@ import type { LocalRow } from "@academic-os/core";
 import type { SqliteLocalDb } from "../lib/sqlite-local-db";
 import { CalendarDays, ListTodo, FileText, Check, X as XIcon, ArrowRight, BadgeCheck, CalendarOff } from "lucide-react";
 import { relativeTime } from "../lib/format";
+import { formatSessionDay, formatSessionTime, TODAY_SESSIONS_SQL, UPCOMING_EVENTS_SQL } from "../lib/schedule";
+import { autoLinkSessions } from "../lib/subject-link";
 
 interface HomeViewProps {
   localDb: SqliteLocalDb;
@@ -24,10 +26,6 @@ interface TodaySession {
   attendance_state: "present" | "absent" | "od" | "cancelled" | null;
 }
 
-function fmtTime(iso: string): string {
-  return new Date(iso).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
-}
-
 /**
  * Home — the thing the nav rail was missing: a single glanceable screen
  * instead of switching tabs to see "what's today, what's due, what did
@@ -36,15 +34,17 @@ function fmtTime(iso: string): string {
  */
 export function HomeView({ localDb, userId, onChanged, onOpenNote, onGoToView, refreshSignal }: HomeViewProps) {
   const [sessions, setSessions] = useState<TodaySession[]>([]);
+  const [upcoming, setUpcoming] = useState<LocalRow[]>([]);
   const [tasksDue, setTasksDue] = useState<LocalRow[]>([]);
   const [recentNotes, setRecentNotes] = useState<LocalRow[]>([]);
 
   async function refresh() {
-    const sessionRows = await localDb.raw.select<Record<string, unknown>[]>(
-      `SELECT * FROM class_sessions
-       WHERE date(starts_at) = date('now', 'localtime') AND status NOT IN ('cancelled', 'superseded') AND deleted_at IS NULL
-       ORDER BY starts_at ASC`
-    );
+    // A freshly imported week arrives with subject_id unset, which hides
+    // the attendance buttons below. Link it before reading. Only ever finds
+    // work once per new week, so the sync this triggers can't loop.
+    if ((await autoLinkSessions(localDb)) > 0) onChanged();
+    const sessionRows = await localDb.raw.select<Record<string, unknown>[]>(TODAY_SESSIONS_SQL);
+    setUpcoming((await localDb.raw.select<Record<string, unknown>[]>(UPCOMING_EVENTS_SQL)) as LocalRow[]);
     const marks = await localDb.raw.select<Record<string, unknown>[]>(
       `SELECT * FROM attendance_marks WHERE deleted_at IS NULL AND marked_for = date('now', 'localtime')`
     );
@@ -122,21 +122,23 @@ export function HomeView({ localDb, userId, onChanged, onOpenNote, onGoToView, r
         <section className="home-card">
           <div className="home-card__head">
             <h2>
-              <CalendarDays size={15} strokeWidth={2} /> Today's classes
+              <CalendarDays size={15} strokeWidth={2} /> Today's schedule
             </h2>
             <button className="home-card__link" onClick={() => onGoToView("timetable")}>
               Archive <ArrowRight size={12} strokeWidth={2} />
             </button>
           </div>
           {sessions.length === 0 ? (
-            <p className="home-card__empty">No classes today.</p>
+            <p className="home-card__empty">Nothing scheduled today.</p>
           ) : (
             <ul className="home-card__list">
               {sessions.map((s) => (
                 <li key={s.id} className="home-session">
-                  <span className="home-session__time">{fmtTime(s.starts_at)}</span>
-                  <span className="home-session__subject">{s.subject_label}</span>
-                  {s.faculty && <span className="home-session__faculty">{s.faculty}</span>}
+                  <span className="home-session__time">{formatSessionTime(s.starts_at, s.ends_at)}</span>
+                  <span className="home-session__main">
+                    <span className="home-session__subject">{s.subject_label}</span>
+                    {s.faculty && <span className="home-session__faculty">{s.faculty}</span>}
+                  </span>
                   {s.subject_id && (
                     <span className="home-session__attendance">
                       <button
@@ -180,6 +182,24 @@ export function HomeView({ localDb, userId, onChanged, onOpenNote, onGoToView, r
                 </li>
               ))}
             </ul>
+          )}
+          {upcoming.length > 0 && (
+            <>
+              <h3 className="home-card__subhead">Next 7 days</h3>
+              <ul className="home-card__list">
+                {upcoming.map((e) => (
+                  <li key={e.id as string} className="home-session">
+                    <span className="home-session__day">{formatSessionDay(e["starts_at"] as string)}</span>
+                    <span className="home-session__time">
+                      {formatSessionTime(e["starts_at"] as string, e["ends_at"] as string)}
+                    </span>
+                    <span className="home-session__main">
+                      <span className="home-session__subject">{e["subject_label"] as string}</span>
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            </>
           )}
         </section>
 

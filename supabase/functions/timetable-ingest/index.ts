@@ -156,12 +156,17 @@ Deno.serve(async (req) => {
     if (weekStart && sessions.length > 0) {
       // Same "supersede, don't delete" rule as the manual upload flow —
       // keeps prior versions of the week browsable in the archive view.
+      // Only sessions that came from a timetable (import_id set): a
+      // revision must not supersede classes added by hand or events
+      // pulled from Google Calendar — superseded sessions get their
+      // Calendar events DELETED, which would wipe the user's own events.
       const { data: previous } = await supabase
         .from("class_sessions")
         .select("id")
         .eq("user_id", userId)
         .eq("week_start", weekStart)
         .eq("status", "scheduled")
+        .not("import_id", "is", null)
         .is("deleted_at", null);
       for (const row of previous ?? []) {
         await supabase.from("class_sessions").update({ status: "superseded" }).eq("id", row.id);

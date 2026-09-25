@@ -6,6 +6,7 @@ const KEYS = {
 } as const;
 
 const CUSTOM_FEEDS_KEY = "academicos.newsCustomFeeds"; // JSON: Record<category, string[]>
+const EXPANDED_FOLDERS_KEY = "academicos.notesExpandedFolders"; // JSON: string[] of node ids
 
 export type ThemeName = "dark" | "light";
 export type ReadingFont = "sans" | "serif";
@@ -40,6 +41,26 @@ export function readCustomFeeds(): Record<string, string[]> {
 export function writeCustomFeeds(feeds: Record<string, string[]>): void {
   try {
     localStorage.setItem(CUSTOM_FEEDS_KEY, JSON.stringify(feeds));
+  } catch {
+    /* private mode / quota */
+  }
+}
+
+/** Which Notes-tree folders are open. The tree unmounts whenever another
+ * view is shown, so without this every folder snapped shut on each trip
+ * to News/Tasks/etc. Per-device UI state, not synced. */
+export function readExpandedFolders(): Set<string> {
+  try {
+    const parsed = JSON.parse(localStorage.getItem(EXPANDED_FOLDERS_KEY) ?? "[]");
+    return new Set(Array.isArray(parsed) ? parsed.filter((x): x is string => typeof x === "string") : []);
+  } catch {
+    return new Set();
+  }
+}
+
+export function writeExpandedFolders(ids: Set<string>): void {
+  try {
+    localStorage.setItem(EXPANDED_FOLDERS_KEY, JSON.stringify([...ids]));
   } catch {
     /* private mode / quota */
   }

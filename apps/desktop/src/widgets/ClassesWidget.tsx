@@ -3,12 +3,10 @@ import { CalendarDays, Plus, Trash2, Pencil, X } from "lucide-react";
 import type { LocalRow } from "@academic-os/core";
 import { useWidgetData } from "./useWidgetData";
 import { WidgetHeader } from "./WidgetHeader";
+import { formatSessionDay, formatSessionTime, TODAY_SESSIONS_SQL, UPCOMING_EVENTS_SQL } from "../lib/schedule";
 
 const POLL_MS = 20_000;
-
-function formatTime(iso: string): string {
-  return new Date(iso).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
-}
+const DEFAULT_DURATION_MS = 60 * 60 * 1000;
 
 function todayDateStr(): string {
   const d = new Date();
@@ -66,8 +64,10 @@ function mondayOf(date: Date): string {
 export function ClassesWidget() {
   const { userId, localDb, loading } = useWidgetData();
   const [sessions, setSessions] = useState<LocalRow[]>([]);
+  const [upcoming, setUpcoming] = useState<LocalRow[]>([]);
   const [formOpen, setFormOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [editingDurationMs, setEditingDurationMs] = useState(DEFAULT_DURATION_MS);
   const [subject, setSubject] = useState("");
   const [time, setTime] = useState("09:00");
   const [room, setRoom] = useState("");
@@ -75,12 +75,10 @@ export function ClassesWidget() {
 
   async function refresh() {
     if (!localDb) return;
-    const rows = await localDb.raw.select<Record<string, unknown>[]>(
-      `SELECT * FROM class_sessions
-       WHERE date(starts_at) = date('now', 'localtime') AND status NOT IN ('cancelled', 'superseded') AND deleted_at IS NULL
-       ORDER BY starts_at ASC`
-    );
+    const rows = await localDb.raw.select<Record<string, unknown>[]>(TODAY_SESSIONS_SQL);
     setSessions(rows as LocalRow[]);
+    const next = await localDb.raw.select<Record<string, unknown>[]>(UPCOMING_EVENTS_SQL);
+    setUpcoming(next as LocalRow[]);
   }
 
   useEffect(() => {
@@ -93,6 +91,7 @@ export function ClassesWidget() {
 
   function openAddForm() {
     setEditingId(null);
+    setEditingDurationMs(DEFAULT_DURATION_MS);
     setSubject("");
     setRoom("");
     setTime("09:00");
@@ -107,6 +106,11 @@ export function ClassesWidget() {
     const startsAt = session["starts_at"] as string;
     setTime(timeStrOf(startsAt));
     setDateStr(dateStrOf(startsAt));
+    // Keep the entry's real length — a 30-minute event, or anything pulled
+    // from Google Calendar, shouldn't silently become an hour long just
+    // because its title or time was edited here (the edit syncs back).
+    const duration = new Date(session["ends_at"] as string).getTime() - new Date(startsAt).getTime();
+    setEditingDurationMs(duration > 0 ? duration : DEFAULT_DURATION_MS);
     setFormOpen(true);
   }
 
@@ -121,7 +125,7 @@ export function ClassesWidget() {
     const label = subject.trim();
     if (!label || !localDb || !userId) return;
     const startsAt = dateAtTime(dateStr, time);
-    const endsAt = new Date(new Date(startsAt).getTime() + 60 * 60 * 1000).toISOString();
+    const endsAt = new Date(new Date(startsAt).getTime() + editingDurationMs).toISOString();
 
     if (editingId) {
       await localDb.put("class_sessions", {
@@ -163,6 +167,26 @@ export function ClassesWidget() {
     await refresh();
   }
 
+  function renderRow(s: LocalRow, withDay: boolean) {
+    const startsAt = s["starts_at"] as string;
+    return (
+      <li key={s.id as string} className="widget-class">
+        <span className="widget-class__time">
+          {withDay && <span className="widget-class__day">{formatSessionDay(startsAt)}</span>}
+          {formatSessionTime(startsAt, s["ends_at"] as string)}
+        </span>
+        <span className="widget-class__subject">{s["subject_label"] as string}</span>
+        {s["room"] ? <span className="widget-class__room">{s["room"] as string}</span> : null}
+        <button className="widget-task__edit" title="Edit" onClick={() => openEditForm(s)}>
+          <Pencil size={11} strokeWidth={2} />
+        </button>
+        <button className="widget-task__delete" title="Delete" onClick={() => void deleteSession(s)}>
+          <Trash2 size={11} strokeWidth={2} />
+        </button>
+      </li>
+    );
+  }
+
   return (
     <div className="widget-panel">
       <WidgetHeader icon={<CalendarDays size={13} strokeWidth={2} />} label="Today" />
@@ -174,23 +198,15 @@ export function ClassesWidget() {
         ) : (
           <>
             {sessions.length === 0 ? (
-              <p className="widget-panel__empty">No classes today.</p>
+              <p className="widget-panel__empty">Nothing scheduled today.</p>
             ) : (
-              <ul className="widget-panel__list">
-                {sessions.map((s) => (
-                  <li key={s.id as string} className="widget-class">
-                    <span className="widget-class__time">{formatTime(s["starts_at"] as string)}</span>
-                    <span className="widget-class__subject">{s["subject_label"] as string}</span>
-                    {s["room"] ? <span className="widget-class__room">{s["room"] as string}</span> : null}
-                    <button className="widget-task__edit" title="Edit" onClick={() => openEditForm(s)}>
-                      <Pencil size={11} strokeWidth={2} />
-                    </button>
-                    <button className="widget-task__delete" title="Delete" onClick={() => void deleteSession(s)}>
-                      <Trash2 size={11} strokeWidth={2} />
-                    </button>
-                  </li>
-                ))}
-              </ul>
+              <ul className="widget-panel__list">{sessions.map((s) => renderRow(s, false))}</ul>
+            )}
+            {upcoming.length > 0 && (
+              <>
+                <p className="widget-panel__section-label">Next 7 days</p>
+                <ul className="widget-panel__list">{upcoming.map((s) => renderRow(s, true))}</ul>
+              </>
             )}
             {formOpen ? (
               <form
@@ -246,7 +262,7 @@ export function ClassesWidget() {
             ) : (
               <button className="widget-task-add" onClick={openAddForm}>
                 <Plus size={13} strokeWidth={2} />
-                <span className="widget-task-add__input">Add a class…</span>
+                <span className="widget-task-add__input">Add a class or event…</span>
               </button>
             )}
           </>
