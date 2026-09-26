@@ -913,7 +913,11 @@ input {
   line-height: 1.7;
 }
 
-.page-editor .bn-block-content p { margin: 0.75em 0; }
+/* Every line is its own block, and a list block's number/bullet is a
+   ::before beside the <p> — a margin on the <p> pushes the text below its
+   marker and stacks up between every line. Space paragraph blocks instead. */
+.page-editor .bn-block-content p { margin: 0; }
+.page-editor .bn-block-content[data-content-type="paragraph"] { padding: 0.3em 0; }
 
 .page-editor .bn-block-content h1 { font-size: 1.9em;  line-height: 1.25; margin: 1.6em 0 0.4em;  font-weight: 650; letter-spacing: -0.01em; }
 .page-editor .bn-block-content h2 { font-size: 1.45em; line-height: 1.3;  margin: 1.5em 0 0.35em; font-weight: 650; }
