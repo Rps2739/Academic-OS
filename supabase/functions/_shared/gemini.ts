@@ -150,3 +150,28 @@ export function toUtcIso(weekStart: string, day: ExtractedSession["day"], hhmm: 
   d.setUTCHours(0, h * 60 + m - IST_OFFSET_MINUTES, 0, 0);
   return d.toISOString();
 }
+
+/** Thrown on HTTP 429. GD Prep deliberately does NOT retry (unlike the
+ * timetable path above): a skipped scheduled scan costs nothing, and retrying
+ * against an exhausted free-tier quota would only burn more of it. */
+export class GeminiRateLimitError extends Error {}
+
+/** One structured-output call; returns the parsed JSON (still untrusted —
+ * callers validate it). The key goes in a header, not the URL, so it
+ * can't end up in any request log. */
+export async function generateJson(prompt: string, schema: unknown, apiKey: string): Promise<unknown> {
+  const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${MODEL}:generateContent`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", "x-goog-api-key": apiKey },
+    body: JSON.stringify({
+      contents: [{ parts: [{ text: prompt }] }],
+      generationConfig: { responseMimeType: "application/json", responseSchema: schema },
+    }),
+  });
+  if (res.status === 429) throw new GeminiRateLimitError("Gemini rate limit reached");
+  if (!res.ok) throw new Error(`Gemini request failed (${res.status}): ${(await res.text()).slice(0, 300)}`);
+  const data = await res.json();
+  const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
+  if (typeof text !== "string") throw new Error("Gemini returned no content");
+  return JSON.parse(text);
+}

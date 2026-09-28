@@ -18,6 +18,7 @@ import { SqliteLocalDb } from "./lib/sqlite-local-db";
 import { createSyncController } from "./lib/sync-loop";
 import { createGTasksSyncController } from "./lib/gtasks-sync-loop";
 import { createGCalSyncController } from "./lib/gcal-sync-loop";
+import { startGdPrepLoop } from "./lib/gd-prep-loop";
 import { enable as enableAutostart, isEnabled as isAutostartEnabled } from "@tauri-apps/plugin-autostart";
 import "./App.css";
 
@@ -77,6 +78,9 @@ function MainLayout({ userId }: { userId: string }) {
 
       const gcal = createGCalSyncController(() => controller.triggerSync());
       stops.push(gcal.start());
+
+      // GD Prep: scheduled scan for GD/interview-worthy news (local-only).
+      stops.push(startGdPrepLoop(db));
     });
 
     // The app is meant to always be running (it's what keeps the desktop

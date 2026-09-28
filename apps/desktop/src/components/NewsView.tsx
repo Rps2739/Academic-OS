@@ -10,6 +10,7 @@ import {
   NotebookPen,
   LineChart,
   Bookmark,
+  GraduationCap,
 } from "lucide-react";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import { useCreateBlockNote } from "@blocknote/react";
@@ -20,6 +21,9 @@ import { relativeTime } from "../lib/format";
 import { readPref, writePref, readCustomFeeds, writeCustomFeeds } from "../lib/reading-prefs";
 import { MarketsPanel } from "./MarketsPanel";
 import { ArticleReader, type ReaderArticle } from "./ArticleReader";
+import { GdPrepPanel } from "./GdPrepPanel";
+import { addManual, listEntries } from "../lib/gd-prep-store";
+import { GD_PREP_EVENT, generateNoteFor, notifyGdPrepChanged } from "../lib/gd-prep-loop";
 
 interface NewsViewProps {
   localDb: SqliteLocalDb;
@@ -55,7 +59,12 @@ const INDIA_SUBTABS = [
   { id: "india-tn", label: "Tamil Nadu" },
 ] as const;
 
-type TabId = (typeof FEED_CATEGORIES)[number]["id"] | "saved" | "markets";
+type TabId = (typeof FEED_CATEGORIES)[number]["id"] | "saved" | "markets" | "gd";
+
+/** True for the tabs that show a live feed category (not Saved/Markets/GD Prep). */
+function isFeedTab(t: TabId): boolean {
+  return t !== "saved" && t !== "markets" && t !== "gd";
+}
 
 const STALE_MS = 30 * 60 * 1000; // 30 minutes
 
@@ -96,7 +105,7 @@ function safeExternalUrl(raw: string): string | null {
 export function NewsView({ localDb, userId, onChanged, onNotify }: NewsViewProps) {
   const [tab, setTab] = useState<TabId>(() => {
     const saved = readPref<TabId>("newsTab", "ai");
-    return FEED_CATEGORIES.some((c) => c.id === saved) || saved === "saved" || saved === "markets"
+    return FEED_CATEGORIES.some((c) => c.id === saved) || saved === "saved" || saved === "markets" || saved === "gd"
       ? saved
       : "ai";
   });
@@ -110,6 +119,7 @@ export function NewsView({ localDb, userId, onChanged, onNotify }: NewsViewProps
   const [customFeeds, setCustomFeeds] = useState<Record<string, string[]>>(() => readCustomFeeds());
   const [newFeedUrl, setNewFeedUrl] = useState("");
   const [readerArticle, setReaderArticle] = useState<ReaderArticle | null>(null);
+  const [gdLinks, setGdLinks] = useState<Set<string>>(new Set());
   // Never rendered — used only for its markdown-to-blocks conversion, so
   // "Save to note" produces real BlockNote blocks rather than hand-crafted
   // JSON that could drift from the library's actual schema.
@@ -137,9 +147,19 @@ export function NewsView({ localDb, userId, onChanged, onNotify }: NewsViewProps
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [userId]);
 
+  // Marks articles already in GD Prep; reloads whenever the scheduled scan,
+  // a manual add, or a delete changes that collection.
+  useEffect(() => {
+    const load = async () => setGdLinks(new Set((await listEntries(localDb)).map((e) => e.link)));
+    void load();
+    const onUpdate = () => void load();
+    window.addEventListener(GD_PREP_EVENT, onUpdate);
+    return () => window.removeEventListener(GD_PREP_EVENT, onUpdate);
+  }, [localDb]);
+
   useEffect(() => {
     setReaderArticle(null);
-    if (tab === "saved" || tab === "markets") return;
+    if (!isFeedTab(tab)) return;
     void loadCategory(activeCategory, false);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeCategory, tab]);
@@ -149,7 +169,7 @@ export function NewsView({ localDb, userId, onChanged, onNotify }: NewsViewProps
   // once STALE_MS has genuinely passed, so this just re-checks on the same
   // cadence rather than forcing a fetch every tick.
   useEffect(() => {
-    if (tab === "saved" || tab === "markets") return;
+    if (!isFeedTab(tab)) return;
     const interval = setInterval(() => void loadCategory(activeCategory, false), STALE_MS);
     return () => clearInterval(interval);
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -299,6 +319,29 @@ export function NewsView({ localDb, userId, onChanged, onNotify }: NewsViewProps
     onNotify("Saved to SIBM / Current Affairs", () => {});
   }
 
+  /** Manual "Add to GD prep": stores the story immediately, then asks the
+   * gd-prep function for its prep note. If that fails the entry stays, with
+   * a "Generate prep note" button on it in the GD Prep tab. */
+  async function addToGdPrep(item: NewsItem) {
+    const entry = await addManual(localDb, {
+      title: item.title,
+      link: item.link,
+      source: item.source,
+      summary: item.summary,
+      published_at: item.published_at,
+    });
+    notifyGdPrepChanged();
+    if (entry.note) {
+      onNotify("Already in GD prep", () => {});
+      return;
+    }
+    onNotify("Added to GD prep. Writing its prep note…", () => {});
+    const result = await generateNoteFor(localDb, entry);
+    if (result === "rateLimited") onNotify("Added, but Gemini's limit was reached. Generate the note later.", () => {});
+    else if (result === "budget") onNotify("Added. Today's AI allowance is used up, so generate the note tomorrow from the GD Prep tab.", () => {});
+    else if (result === "failed") onNotify("Added, but the prep note failed. Generate it from the GD Prep tab.", () => {});
+  }
+
   function addCustomFeed() {
     const url = newFeedUrl.trim();
     if (!url) return;
@@ -390,6 +433,13 @@ export function NewsView({ localDb, userId, onChanged, onNotify }: NewsViewProps
             <NotebookPen size={14} strokeWidth={2} />
           </button>
           <button
+            className={`icon-btn ${gdLinks.has(item.link) ? "icon-btn--active" : ""}`}
+            title={gdLinks.has(item.link) ? "In GD prep" : "Add to GD prep"}
+            onClick={() => void addToGdPrep(item)}
+          >
+            <GraduationCap size={14} strokeWidth={2} />
+          </button>
+          <button
             className="icon-btn"
             title="Open link"
             onClick={() => {
@@ -411,12 +461,12 @@ export function NewsView({ localDb, userId, onChanged, onNotify }: NewsViewProps
           <Newspaper size={18} strokeWidth={2} /> News
         </h2>
         <div className="news-view__head-actions">
-          {tab !== "saved" && tab !== "markets" && (
+          {isFeedTab(tab) && (
             <button className="btn btn--ghost btn--sm" onClick={() => setManageOpen((v) => !v)}>
               <Settings2 size={13} strokeWidth={2} /> Sources
             </button>
           )}
-          {tab !== "saved" && tab !== "markets" && (
+          {isFeedTab(tab) && (
             <button
               className="btn btn--ghost btn--sm"
               disabled={loading}
@@ -445,6 +495,12 @@ export function NewsView({ localDb, userId, onChanged, onNotify }: NewsViewProps
           <Bookmark size={12} strokeWidth={2} /> Saved
         </button>
         <button
+          className={`news-view__tab ${tab === "gd" ? "news-view__tab--active" : ""}`}
+          onClick={() => setTab("gd")}
+        >
+          <GraduationCap size={12} strokeWidth={2} /> GD Prep
+        </button>
+        <button
           className={`news-view__tab ${tab === "markets" ? "news-view__tab--active" : ""}`}
           onClick={() => setTab("markets")}
         >
@@ -466,7 +522,7 @@ export function NewsView({ localDb, userId, onChanged, onNotify }: NewsViewProps
         </div>
       )}
 
-      {manageOpen && tab !== "saved" && tab !== "markets" && (
+      {manageOpen && isFeedTab(tab) && (
         <div className="news-view__manage">
           <p className="news-view__manage-hint">
             Add your own RSS/Atom feed URL for <strong>{activeCategory}</strong>:
@@ -504,7 +560,14 @@ export function NewsView({ localDb, userId, onChanged, onNotify }: NewsViewProps
         <MarketsPanel localDb={localDb} userId={userId} onNotify={onNotify} />
       ) : (
         <div className={`news-view__layout ${readerArticle ? "news-view__layout--split" : ""}`}>
-          {tab === "saved" ? (
+          {tab === "gd" ? (
+            <GdPrepPanel
+              localDb={localDb}
+              openLink={readerArticle?.link ?? null}
+              onOpenArticle={openArticle}
+              onNotify={onNotify}
+            />
+          ) : tab === "saved" ? (
             <div className="news-list">
               {savedItems.length === 0 ? (
                 <div className="news-view__empty">No bookmarks yet. Star an article to save it here.</div>

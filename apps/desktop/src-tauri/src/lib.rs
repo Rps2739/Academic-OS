@@ -244,6 +244,27 @@ fn migrations() -> Vec<Migration> {
             );
             CREATE INDEX idx_sync_conflicts_row ON sync_conflicts_local (table_name, row_id);
         ",
+    }, Migration {
+        // GD Prep (docs/superpowers/specs/2026-09-26-gd-prep-design.md).
+        // Local-only by the user's choice — deliberately NOT in SYNC_TABLES,
+        // read/written via localDb.raw like news_items_local. UNIQUE(link)
+        // stops the same story being stored twice; a deleted row keeps its
+        // link so a scheduled scan can't bring back something the user removed.
+        // gd_seen_local remembers which headlines were already shown to
+        // Gemini so each scheduled scan only sends new ones.
+        version: 9,
+        description: "gd_prep_local",
+        kind: MigrationKind::Up,
+        sql: "
+            CREATE TABLE gd_prep_local (
+                id TEXT PRIMARY KEY, added_at TEXT NOT NULL, deleted_at TEXT,
+                title TEXT NOT NULL, link TEXT NOT NULL UNIQUE, source TEXT, summary TEXT, published_at TEXT,
+                theme TEXT, why TEXT, points_for TEXT, points_against TEXT, key_facts TEXT, question TEXT,
+                manual INTEGER NOT NULL DEFAULT 0
+            );
+            CREATE INDEX idx_gd_prep_added ON gd_prep_local (added_at DESC);
+            CREATE TABLE gd_seen_local (id TEXT PRIMARY KEY, seen_at TEXT NOT NULL);
+        ",
     }]
 }
 

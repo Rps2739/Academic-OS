@@ -938,6 +938,20 @@ input {
 .page-editor pre  { background: var(--surface-2); border-radius: var(--radius-md); padding: var(--space-3); overflow-x: auto; }
 .page-editor table { display: block; overflow-x: auto; max-width: 100%; }
 
+/* BlockNote's own codeBlock CSS hardcodes background-color:#161616 and
+   color:#fff on the block, regardless of theme. In dark mode that white
+   text happened to land on a similarly dark --surface-2 background from
+   the rule above, so it looked fine by accident — in light mode the
+   background flips to near-white but the text stays white, going
+   invisible. Override both explicitly so code blocks track the theme. */
+.page-editor .bn-block-content[data-content-type="codeBlock"] {
+  background-color: var(--surface-2);
+  color: var(--ink);
+}
+.page-editor .bn-block-content[data-content-type="codeBlock"] > div > select {
+  color: var(--ink);
+}
+
 /* ============================================================
    Note outline + highlights rail
    ============================================================ */
@@ -3671,4 +3685,148 @@ body.widget-window {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+/* ============================================================
+   News → GD Prep tab
+   ============================================================ */
+.gd-prep__status {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  margin-bottom: var(--space-3);
+}
+
+.gd-prep__status-text {
+  font-size: var(--text-xs);
+  color: var(--muted);
+}
+
+.gd-prep__status-text--error {
+  color: var(--warning);
+}
+
+.gd-prep__themes {
+  flex-wrap: wrap;
+}
+
+.gd-prep__day-label {
+  margin: var(--space-3) 0 0;
+  font-size: var(--text-xs);
+  font-weight: 650;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--muted);
+}
+
+.gd-prep__main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.gd-prep__theme,
+.gd-prep__badge {
+  flex-shrink: 0;
+  padding: 1px var(--space-2);
+  border-radius: var(--radius-full);
+  font-size: 10px;
+  font-weight: 650;
+  white-space: nowrap;
+}
+
+.gd-prep__theme {
+  background: var(--accent-tint);
+  color: var(--accent);
+}
+
+.gd-prep__badge {
+  border: 1px solid var(--border);
+  color: var(--muted);
+}
+
+.gd-prep__toggle {
+  align-self: flex-start;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--muted);
+  font-size: var(--text-xs);
+  font-weight: 550;
+  cursor: pointer;
+}
+
+.gd-prep__toggle:hover {
+  color: var(--ink);
+}
+
+.gd-prep__toggle svg {
+  transition: transform 0.15s ease;
+}
+
+.gd-prep__chevron--open {
+  transform: rotate(180deg);
+}
+
+.gd-prep__generate {
+  align-self: flex-start;
+}
+
+.gd-prep__note {
+  padding: var(--space-3);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--surface-2);
+  color: var(--ink);
+  font-size: var(--text-sm);
+  line-height: 1.55;
+}
+
+.gd-prep__note h4 {
+  margin: var(--space-3) 0 4px;
+  font-size: var(--text-xs);
+  font-weight: 650;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--muted);
+}
+
+.gd-prep__note h4:first-child {
+  margin-top: 0;
+}
+
+.gd-prep__note p {
+  margin: 0;
+}
+
+.gd-prep__note ul {
+  margin: 0;
+  padding-left: 1.2em;
+}
+
+.gd-prep__note li + li {
+  margin-top: 2px;
+}
+
+.gd-prep__sides {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: var(--space-3);
+  margin-top: var(--space-3);
+}
+
+.gd-prep__question {
+  font-style: italic;
+}
+
+.gd-prep__note .gd-prep__disclaimer {
+  margin-top: var(--space-3);
+  font-size: var(--text-xs);
+  color: var(--muted);
 }
