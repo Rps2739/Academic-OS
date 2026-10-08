@@ -1,0 +1,44 @@
+product_id,product_name,category,sub_category,brand,unit_price,cost_price
+1,Nova Smartphone 5G,Electronics,Mobiles,Nova,47523.42,34206.59
+2,Nova Smartphone Lite,Electronics,Mobiles,Nova,23409.51,14902.92
+3,Zentek Feature Phone,Electronics,Mobiles,Zentek,48782.86,35138.75
+4,Zentek Ultrabook 14,Electronics,Laptops,Zentek,43120.71,33543.2
+5,Orbit Gaming Laptop 15,Electronics,Laptops,Orbit,85807.22,48739.35
+6,Zentek Student Laptop,Electronics,Laptops,Zentek,114860.53,64475.2
+7,Zentek Wireless Earbuds,Electronics,Accessories,Zentek,2054.32,1581.03
+8,Orbit Power Bank 20000mAh,Electronics,Accessories,Orbit,4906.17,3392.32
+9,Zentek USB-C Charger,Electronics,Accessories,Zentek,2612.29,2040.19
+10,Orbit Bluetooth Speaker,Electronics,Accessories,Orbit,2224.42,1443.42
+11,Tulsi Mixer Grinder,Home,Kitchen,Tulsi,2912.88,2090.18
+12,Griha Pressure Cooker 5L,Home,Kitchen,Griha,2356.73,1443.8
+13,Griha Non-stick Tawa,Home,Kitchen,Griha,2952.61,1817.52
+14,Griha Study Table,Home,Furniture,Griha,9102.98,6080.51
+15,Griha Office Chair,Home,Furniture,Griha,12017.37,7992.99
+16,Griha Bookshelf,Home,Furniture,Griha,9816.38,6686.5
+17,Tulsi Wall Clock,Home,Decor,Tulsi,1180.84,783.94
+18,Casa Table Lamp,Home,Decor,Casa,2287.36,1768.8
+19,Tulsi Cushion Covers (Set of 5),Home,Decor,Tulsi,506.31,385.64
+20,Stride Cotton Kurta,Fashion,Men,Stride,2200.92,1624.91
+21,Stride Formal Shirt,Fashion,Men,Stride,2366.29,1817.06
+22,Stride Denim Jeans,Fashion,Men,Stride,1730.13,1206.91
+23,Rangoli Silk Saree,Fashion,Women,Rangoli,8381.27,5543.89
+24,Rangoli Kurti Set,Fashion,Women,Rangoli,848.83,591.91
+25,Rangoli Handbag,Fashion,Women,Rangoli,5164.53,3801.76
+26,Stride Running Shoes,Fashion,Footwear,Stride,3660.35,2391
+27,Stride Leather Sandals,Fashion,Footwear,Stride,2002.96,1451.08
+28,Urban Loom Sneakers,Fashion,Footwear,Urban,4514.46,2817.49
+29,Annapurna Basmati Rice 5kg,Grocery,Staples,Annapurna,127.4,88.47
+30,Desi Farm Toor Dal 1kg,Grocery,Staples,Desi,353.42,253.93
+31,Kaveri Atta 10kg,Grocery,Staples,Kaveri,341.54,197.7
+32,Annapurna Masala Chips,Grocery,Snacks,Annapurna,377.92,279.48
+33,Kaveri Roasted Makhana,Grocery,Snacks,Kaveri,441.38,313.37
+34,Annapurna Dry Fruit Mix,Grocery,Snacks,Annapurna,472.19,333.32
+35,Kaveri Assam Tea 500g,Grocery,Beverages,Kaveri,300.32,208.98
+36,Annapurna Filter Coffee 500g,Grocery,Beverages,Annapurna,340.49,194.9
+37,Desi Farm Mango Drink 1L,Grocery,Beverages,Desi,456.06,314.38
+38,Monsoon Letters (Novel),Books,Fiction,Sahitya,458.4,281.15
+39,The Last Train (Novel),Books,Fiction,Pustak Press,591.99,336.83
+40,Strategy Essentials,Books,Business,Pustak Press,1279.05,978.64
+41,Marketing Management,Books,Business,Pustak Press,924.35,690.28
+42,CAT Quant Guide,Books,Exam Prep,Sahitya,609.59,481.8
+43,UPSC GS Manual,Books,Exam Prep,Pustak Press,565.62,442.27

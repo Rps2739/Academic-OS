@@ -1,4 +1,5 @@
 import { supabase } from "./supabase";
+import { reportGoogleSyncResult } from "./google-auth-status";
 
 const INTERVAL_MS = 2 * 60 * 1000; // same cadence as Google Tasks — this now also pulls events the user adds/edits in Google Calendar, which should show up in the widgets reasonably quickly
 
@@ -18,6 +19,7 @@ export function createGCalSyncController(onSynced: () => void) {
     syncing = true;
     try {
       const { error } = await supabase.functions.invoke("gcal-sync");
+      await reportGoogleSyncResult(error);
       if (error) {
         console.error("Google Calendar sync failed:", error);
       } else {

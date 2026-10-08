@@ -1,0 +1,225 @@
+{
+  "tables": [
+    {
+      "name": "regions",
+      "file": "regions.csv",
+      "description": "Five sales regions of Bharat Retail.",
+      "columns": [
+        {
+          "name": "region_id",
+          "type": "INTEGER"
+        },
+        {
+          "name": "region_name",
+          "type": "TEXT"
+        },
+        {
+          "name": "head_city",
+          "type": "TEXT"
+        }
+      ]
+    },
+    {
+      "name": "customers",
+      "file": "customers.csv",
+      "description": "300 customers. A few names have stray spaces/lowercase and a few cities/emails are missing — on purpose, for cleaning practice.",
+      "columns": [
+        {
+          "name": "customer_id",
+          "type": "INTEGER"
+        },
+        {
+          "name": "full_name",
+          "type": "TEXT"
+        },
+        {
+          "name": "email",
+          "type": "TEXT"
+        },
+        {
+          "name": "city",
+          "type": "TEXT"
+        },
+        {
+          "name": "state",
+          "type": "TEXT"
+        },
+        {
+          "name": "region_id",
+          "type": "INTEGER"
+        },
+        {
+          "name": "segment",
+          "type": "TEXT"
+        },
+        {
+          "name": "signup_date",
+          "type": "TEXT"
+        }
+      ]
+    },
+    {
+      "name": "products",
+      "file": "products.csv",
+      "description": "Product catalogue across five categories. Prices in INR.",
+      "columns": [
+        {
+          "name": "product_id",
+          "type": "INTEGER"
+        },
+        {
+          "name": "product_name",
+          "type": "TEXT"
+        },
+        {
+          "name": "category",
+          "type": "TEXT"
+        },
+        {
+          "name": "sub_category",
+          "type": "TEXT"
+        },
+        {
+          "name": "brand",
+          "type": "TEXT"
+        },
+        {
+          "name": "unit_price",
+          "type": "REAL"
+        },
+        {
+          "name": "cost_price",
+          "type": "REAL"
+        }
+      ]
+    },
+    {
+      "name": "employees",
+      "file": "employees.csv",
+      "description": "40 employees; department heads have no manager_id. Salary is annual, INR.",
+      "columns": [
+        {
+          "name": "employee_id",
+          "type": "INTEGER"
+        },
+        {
+          "name": "full_name",
+          "type": "TEXT"
+        },
+        {
+          "name": "department",
+          "type": "TEXT"
+        },
+        {
+          "name": "manager_id",
+          "type": "INTEGER"
+        },
+        {
+          "name": "city",
+          "type": "TEXT"
+        },
+        {
+          "name": "hire_date",
+          "type": "TEXT"
+        },
+        {
+          "name": "salary",
+          "type": "INTEGER"
+        }
+      ]
+    },
+    {
+      "name": "orders",
+      "file": "orders.csv",
+      "description": "2,500 orders, Jul 2024 – Jun 2026. Oct–Nov (festive season) is busier.",
+      "columns": [
+        {
+          "name": "order_id",
+          "type": "INTEGER"
+        },
+        {
+          "name": "customer_id",
+          "type": "INTEGER"
+        },
+        {
+          "name": "employee_id",
+          "type": "INTEGER"
+        },
+        {
+          "name": "order_date",
+          "type": "TEXT"
+        },
+        {
+          "name": "status",
+          "type": "TEXT"
+        },
+        {
+          "name": "payment_method",
+          "type": "TEXT"
+        },
+        {
+          "name": "region_id",
+          "type": "INTEGER"
+        }
+      ]
+    },
+    {
+      "name": "order_items",
+      "file": "order_items.csv",
+      "description": "Line items: quantity, price actually charged, and discount (0–0.15).",
+      "columns": [
+        {
+          "name": "order_item_id",
+          "type": "INTEGER"
+        },
+        {
+          "name": "order_id",
+          "type": "INTEGER"
+        },
+        {
+          "name": "product_id",
+          "type": "INTEGER"
+        },
+        {
+          "name": "quantity",
+          "type": "INTEGER"
+        },
+        {
+          "name": "unit_price",
+          "type": "REAL"
+        },
+        {
+          "name": "discount",
+          "type": "REAL"
+        }
+      ]
+    },
+    {
+      "name": "monthly_sales",
+      "file": "monthly_sales.csv",
+      "description": "Delivered revenue and units per month × region × category (net of discount).",
+      "columns": [
+        {
+          "name": "month",
+          "type": "TEXT"
+        },
+        {
+          "name": "region_id",
+          "type": "INTEGER"
+        },
+        {
+          "name": "category",
+          "type": "TEXT"
+        },
+        {
+          "name": "revenue",
+          "type": "REAL"
+        },
+        {
+          "name": "units",
+          "type": "INTEGER"
+        }
+      ]
+    }
+  ]
+}

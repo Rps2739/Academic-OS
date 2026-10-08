@@ -29,3 +29,9 @@ Thumbs.db
 
 # Real timetable data — contains real faculty/room info
 samples/
+
+# Brainstorming visual-companion mockups (local only)
+.superpowers/
+
+# Practice lab engine (Pyodide + wheels, ~150 MB) — fetched by scripts/fetch-pyodide.mjs, never committed
+apps/desktop/public/pyodide/

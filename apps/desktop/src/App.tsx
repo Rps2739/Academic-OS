@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import type { LocalRow } from "@academic-os/core";
-import { FileText, NotebookText, ListTodo, CalendarDays, Undo2, Home, BookOpen, Briefcase, Columns2, X, Newspaper } from "lucide-react";
+import { FileText, NotebookText, ListTodo, CalendarDays, Undo2, Home, BookOpen, Briefcase, Columns2, X, Newspaper, FlaskConical, MessagesSquare } from "lucide-react";
 import { AuthGate } from "./components/AuthGate";
 import { ErrorBoundary } from "./components/ErrorBoundary";
 import { TreeSidebar } from "./components/TreeSidebar";
@@ -14,18 +14,23 @@ import { HomeView } from "./components/HomeView";
 import { SubjectsView } from "./components/SubjectsView";
 import { ProjectsView } from "./components/ProjectsView";
 import { NewsView } from "./components/NewsView";
+import { PracticeView } from "./components/PracticeView";
+import { InterviewerView } from "./components/InterviewerView";
 import { SqliteLocalDb } from "./lib/sqlite-local-db";
 import { createSyncController } from "./lib/sync-loop";
 import { createGTasksSyncController } from "./lib/gtasks-sync-loop";
 import { createGCalSyncController } from "./lib/gcal-sync-loop";
 import { startGdPrepLoop } from "./lib/gd-prep-loop";
+import { GoogleAuthBanner } from "./components/GoogleAuthBanner";
+import { checkDatabase, isCorruptionError, maybeDailyBackup, requestRepair, takeRepairNotice } from "./lib/db-health";
 import { enable as enableAutostart, isEnabled as isAutostartEnabled } from "@tauri-apps/plugin-autostart";
 import "./App.css";
 
-type View = "home" | "notes" | "tasks" | "subjects" | "projects" | "timetable" | "news";
+type View = "home" | "notes" | "tasks" | "subjects" | "projects" | "timetable" | "news" | "practice" | "interviewer";
 
 function MainLayout({ userId }: { userId: string }) {
   const [localDb, setLocalDb] = useState<SqliteLocalDb | null>(null);
+  const [dbBroken, setDbBroken] = useState(false);
   const [selected, setSelected] = useState<LocalRow | null>(null);
   const [splitSelected, setSplitSelected] = useState<LocalRow | null>(null);
   const [outlineBlocks, setOutlineBlocks] = useState<Block[]>([]);
@@ -35,6 +40,8 @@ function MainLayout({ userId }: { userId: string }) {
   const [toast, setToast] = useState<{ message: string; undo: () => void } | null>(null);
   const startedRef = useRef(false);
   const syncRef = useRef<ReturnType<typeof createSyncController> | null>(null);
+  // Lets the "Google sign-in expired" banner run one calendar sync on demand.
+  const recheckGoogleRef = useRef<() => Promise<void>>(async () => {});
   const toastTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
 
   /** A low-friction safety net for deletes: no "are you sure?" dialog
@@ -63,8 +70,29 @@ function MainLayout({ userId }: { userId: string }) {
     // correct, and it stops duplicate loops under React StrictMode/HMR).
     const stops: Array<() => void> = [];
 
-    void SqliteLocalDb.open().then(async (db) => {
+    void SqliteLocalDb.open()
+      .catch((err) => {
+        // A corrupt file makes the plugin's first load (which also runs the
+        // migrations) throw before we ever get a handle.
+        if (isCorruptionError(err)) setDbBroken(true);
+        else console.error("opening the local database failed:", err);
+        return null;
+      })
+      .then(async (db) => {
+      if (!db) return;
+      if (!(await checkDatabase(db))) {
+        setDbBroken(true);
+        return;
+      }
       setLocalDb(db);
+      // If the previous run repaired a damaged database, tell the user.
+      const repairedInto = await takeRepairNotice();
+      if (repairedInto) {
+        notify(
+          `Your local copy was damaged, so the app rebuilt it from your Supabase copy. The damaged file was kept in ${repairedInto}. Daily backups are in the "backups" folder next to it.`,
+          () => {}
+        );
+      }
       const deviceId = await db.getOrCreateDeviceId();
       const controller = createSyncController(db, deviceId);
       syncRef.current = controller;
@@ -77,10 +105,14 @@ function MainLayout({ userId }: { userId: string }) {
       stops.push(gtasks.start());
 
       const gcal = createGCalSyncController(() => controller.triggerSync());
+      recheckGoogleRef.current = () => gcal.runOnce();
       stops.push(gcal.start());
 
       // GD Prep: scheduled scan for GD/interview-worthy news (local-only).
       stops.push(startGdPrepLoop(db));
+
+      // After the sync loops are going, so a slow backup never delays them.
+      void maybeDailyBackup(db);
     });
 
     // The app is meant to always be running (it's what keeps the desktop
@@ -111,6 +143,26 @@ function MainLayout({ userId }: { userId: string }) {
     setView("notes");
   }
 
+  if (dbBroken) {
+    return (
+      <div className="db-repair">
+        <h1>Your local notes database is damaged</h1>
+        <p>
+          This happens rarely (for example if the app was interrupted while saving). Your notes, tasks and classes are safe
+          in your Supabase copy.
+        </p>
+        <p>
+          <strong>Repair and restart</strong> moves the damaged file into a dated backup folder (nothing is deleted),
+          restarts the app, and downloads everything again from Supabase. Things that live only on this laptop (GD Prep
+          stories, practice progress, note edit history) can be recovered from the daily backups folder if needed.
+        </p>
+        <button className="btn btn--primary" onClick={() => void requestRepair()}>
+          Repair and restart
+        </button>
+      </div>
+    );
+  }
+
   if (!localDb) {
     return (
       <div className="app-loading">
@@ -120,6 +172,8 @@ function MainLayout({ userId }: { userId: string }) {
   }
 
   return (
+    <>
+    <GoogleAuthBanner onRecheck={() => recheckGoogleRef.current()} />
     <div className="app-layout">
       <nav className="nav-rail">
         {([
@@ -130,6 +184,8 @@ function MainLayout({ userId }: { userId: string }) {
           { id: "projects", label: "Projects", Icon: Briefcase },
           { id: "timetable", label: "Timetable", Icon: CalendarDays },
           { id: "news", label: "News", Icon: Newspaper },
+          { id: "practice", label: "Practice", Icon: FlaskConical },
+          { id: "interviewer", label: "Interviewer", Icon: MessagesSquare },
         ] as const).map(({ id, label, Icon }) => (
           <button
             key={id}
@@ -263,6 +319,14 @@ function MainLayout({ userId }: { userId: string }) {
         <main className="app-main app-main--news">
           <NewsView localDb={localDb} userId={userId} onChanged={triggerSync} onNotify={notify} />
         </main>
+      ) : view === "practice" ? (
+        <main className="app-main app-main--practice">
+          <PracticeView localDb={localDb} />
+        </main>
+      ) : view === "interviewer" ? (
+        <main className="app-main app-main--interviewer">
+          <InterviewerView localDb={localDb} />
+        </main>
       ) : (
         <main className="app-main app-main--timetable">
           <TimetableView localDb={localDb} userId={userId} onChanged={triggerSync} />
@@ -285,6 +349,7 @@ function MainLayout({ userId }: { userId: string }) {
         </div>
       )}
     </div>
+    </>
   );
 }
 

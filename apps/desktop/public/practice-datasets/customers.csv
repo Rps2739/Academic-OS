@@ -1,0 +1,301 @@
+customer_id,full_name,email,city,state,region_id,segment,signup_date
+1,Zoya Reddy,zoya.reddy1@example.com,Bhopal,Madhya Pradesh,5,Small Business,2026-06-12
+2,Meera Kapoor,meera.kapoor2@example.com,Chandigarh,Chandigarh,1,Consumer,2024-05-02
+3,Divya Sharma,divya.sharma3@example.com,Jaipur,Rajasthan,1,Consumer,2026-03-17
+4,Zoya Mishra,zoya.mishra4@example.com,Ahmedabad,Gujarat,3,Consumer,2026-02-03
+5,Meera Sharma,meera.sharma5@example.com,Nagpur,Maharashtra,5,Consumer,2025-10-08
+6,Rekha Malhotra,rekha.malhotra6@example.com,Lucknow,Uttar Pradesh,1,Small Business,2026-04-01
+7,Neha Fernandes,neha.fernandes7@example.com,Lucknow,Uttar Pradesh,1,Consumer,2024-10-17
+8,Aishwarya Singh,aishwarya.singh8@example.com,Indore,Madhya Pradesh,5,Consumer,2024-05-26
+9,Aarav Verma,aarav.verma9@example.com,Bhopal,Madhya Pradesh,5,Small Business,2024-06-02
+10,Varun Naidu,varun.naidu10@example.com,Bhopal,Madhya Pradesh,5,Consumer,2024-12-29
+11,Sruthi Pillai,sruthi.pillai11@example.com,Bengaluru,Karnataka,2,Consumer,2025-08-25
+12,Aarav Chatterjee,aarav.chatterjee12@example.com,Pune,Maharashtra,3,Small Business,2024-05-06
+13,Karthik Fernandes,karthik.fernandes13@example.com,Hyderabad,Telangana,2,Consumer,2025-11-11
+14,Aditya Pillai,aditya.pillai14@example.com,Bengaluru,Karnataka,2,Small Business,2024-09-28
+15,Priya Reddy,priya.reddy15@example.com,Mumbai,Maharashtra,3,Consumer,2025-07-21
+16,Diya Kapoor,diya.kapoor16@example.com,Jaipur,Rajasthan,1,Corporate,2024-11-06
+17,Manoj Dsouza,manoj.dsouza17@example.com,Mumbai,Maharashtra,3,Consumer,2025-04-17
+18,Rekha Pillai,rekha.pillai18@example.com,Lucknow,Uttar Pradesh,1,Consumer,2024-08-12
+19,Lakshmi Khan,lakshmi.khan19@example.com,Kolkata,West Bengal,4,Corporate,2026-05-19
+20,Priya Singh,priya.singh20@example.com,Delhi,Delhi,1,Small Business,2025-02-04
+21,Arjun Gupta,arjun.gupta21@example.com,Kolkata,West Bengal,4,Corporate,2024-04-13
+22,Ananya Mishra,ananya.mishra22@example.com,Chennai,Tamil Nadu,2,Consumer,2024-06-15
+23,Zoya Reddy,zoya.reddy23@example.com,,Maharashtra,5,Small Business,2024-03-01
+24,Diya Chatterjee,diya.chatterjee24@example.com,Panaji,Goa,3,Consumer,2025-09-28
+25,Sruthi Sinha,sruthi.sinha25@example.com,Chennai,Tamil Nadu,2,Consumer,2025-10-28
+26,Vivaan Mishra,vivaan.mishra26@example.com,,Chhattisgarh,5,Consumer,2024-08-24
+27,Arjun Deshpande,arjun.deshpande27@example.com,Mumbai,Maharashtra,3,Consumer,2025-09-09
+28,Priya Banerjee,priya.banerjee28@example.com,Lucknow,Uttar Pradesh,1,Consumer,2025-07-01
+29,Nikhil Patel,nikhil.patel29@example.com,Bengaluru,Karnataka,2,Consumer,2025-09-07
+30,Vivaan Dsouza,vivaan.dsouza30@example.com,Nagpur,Maharashtra,5,Consumer,2024-10-01
+31,Deepak Verma,deepak.verma31@example.com,Delhi,Delhi,1,Corporate,2024-02-28
+32,Ishaan Kulkarni,ishaan.kulkarni32@example.com,Indore,Madhya Pradesh,5,Corporate,2025-04-10
+33,Rahul Menon,rahul.menon33@example.com,Mumbai,Maharashtra,3,Small Business,2024-08-19
+34,Arjun Gowda,arjun.gowda34@example.com,Indore,Madhya Pradesh,5,Consumer,2025-11-03
+35,Tenzin Kapoor,tenzin.kapoor35@example.com,Bengaluru,Karnataka,2,Consumer,2025-11-01
+36,  deepak bose ,deepak.bose36@example.com,Patna,Bihar,4,Corporate,2024-07-24
+37,Rahul Kulkarni,rahul.kulkarni37@example.com,Lucknow,Uttar Pradesh,1,Corporate,2025-11-14
+38,Tenzin Sinha,tenzin.sinha38@example.com,Bengaluru,Karnataka,2,Consumer,2024-01-15
+39,Karthik Rao,karthik.rao39@example.com,Indore,Madhya Pradesh,5,Small Business,2024-02-18
+40,Divya Sinha,divya.sinha40@example.com,Panaji,Goa,3,Corporate,2025-01-30
+41,Aditya Naidu,aditya.naidu41@example.com,Mumbai,Maharashtra,3,Consumer,2024-11-12
+42,Sai Iyer,sai.iyer42@example.com,Indore,Madhya Pradesh,5,Consumer,2026-01-15
+43,Pooja Agarwal,pooja.agarwal43@example.com,Kolkata,West Bengal,4,Corporate,2025-06-07
+44,Rekha Dsouza,rekha.dsouza44@example.com,Delhi,Delhi,1,Consumer,2025-09-26
+45,Aishwarya Dsouza,aishwarya.dsouza45@example.com,Kochi,Kerala,2,Consumer,2026-02-28
+46,Rahul Gowda,rahul.gowda46@example.com,Chandigarh,Chandigarh,1,Consumer,2025-03-26
+47,Simran Gowda,simran.gowda47@example.com,Pune,Maharashtra,3,Small Business,2024-05-22
+48,Aditya Mishra,aditya.mishra48@example.com,Panaji,Goa,3,Small Business,2024-01-29
+49,Kavya Rao,kavya.rao49@example.com,Bengaluru,Karnataka,2,Small Business,2024-05-06
+50,  abhishek verma ,abhishek.verma50@example.com,Ahmedabad,Gujarat,3,Consumer,2026-04-19
+51,Aditya Gowda,aditya.gowda51@example.com,Chennai,Tamil Nadu,2,Consumer,2024-09-11
+52,Rahul Singh,rahul.singh52@example.com,Mumbai,Maharashtra,3,Corporate,2025-09-24
+53,Rekha Naidu,rekha.naidu53@example.com,Ahmedabad,Gujarat,3,Consumer,2024-10-31
+54,Simran Malhotra,simran.malhotra54@example.com,Kochi,Kerala,2,Consumer,2025-07-01
+55,Sai Banerjee,sai.banerjee55@example.com,Jaipur,Rajasthan,1,Corporate,2024-08-19
+56,Ritu Naidu,ritu.naidu56@example.com,Jaipur,Rajasthan,1,Small Business,2025-06-18
+57,Gurpreet Kapoor,gurpreet.kapoor57@example.com,Kochi,Kerala,2,Small Business,2026-01-04
+58,Nikhil Menon,nikhil.menon58@example.com,Bengaluru,Karnataka,2,Consumer,2025-12-01
+59,Imran Iyer,imran.iyer59@example.com,Bhopal,Madhya Pradesh,5,Small Business,2024-12-22
+60,Aarav Patel,aarav.patel60@example.com,Chennai,Tamil Nadu,2,Consumer,2026-05-10
+61,Pooja Menon,pooja.menon61@example.com,Lucknow,Uttar Pradesh,1,Small Business,2025-09-27
+62,Rekha Pillai,rekha.pillai62@example.com,Bengaluru,Karnataka,2,Consumer,2025-12-05
+63,Imran Singh,imran.singh63@example.com,Chandigarh,Chandigarh,1,Corporate,2025-02-21
+64,Priya Rao,priya.rao64@example.com,Mumbai,Maharashtra,3,Consumer,2025-01-30
+65,Deepak Agarwal,deepak.agarwal65@example.com,Bengaluru,Karnataka,2,Corporate,2025-11-14
+66,Vivaan Reddy,vivaan.reddy66@example.com,Bengaluru,Karnataka,2,Consumer,2026-04-28
+67,Anjali Reddy,anjali.reddy67@example.com,Bengaluru,Karnataka,2,Consumer,2026-05-20
+68,Rekha Pillai,rekha.pillai68@example.com,Guwahati,Assam,4,Consumer,2025-07-18
+69,Ananya Verma,ananya.verma69@example.com,,Chandigarh,1,Consumer,2024-03-31
+70,Pooja Khan,pooja.khan70@example.com,Nagpur,Maharashtra,5,Consumer,2025-02-09
+71,Lakshmi Iyer,lakshmi.iyer71@example.com,Lucknow,Uttar Pradesh,1,Consumer,2024-10-13
+72,Zoya Gowda,zoya.gowda72@example.com,Hyderabad,Telangana,2,Consumer,2024-02-28
+73,Harish Reddy,harish.reddy73@example.com,Indore,Madhya Pradesh,5,Consumer,2025-05-23
+74,Tenzin Iyer,tenzin.iyer74@example.com,Delhi,Delhi,1,Consumer,2024-07-02
+75,Karthik Mishra,karthik.mishra75@example.com,Chennai,Tamil Nadu,2,Consumer,2024-02-06
+76,Pooja Patel,pooja.patel76@example.com,Nagpur,Maharashtra,5,Consumer,2025-09-30
+77,Arjun Singh,arjun.singh77@example.com,Chennai,Tamil Nadu,2,Small Business,2024-08-07
+78,Rohan Gowda,rohan.gowda78@example.com,Indore,Madhya Pradesh,5,Consumer,2024-02-14
+79,Aditya Shah,aditya.shah79@example.com,Delhi,Delhi,1,Consumer,2025-08-01
+80,Rohan Verma,rohan.verma80@example.com,Raipur,Chhattisgarh,5,Consumer,2025-02-27
+81,Diya Shah,diya.shah81@example.com,Chennai,Tamil Nadu,2,Corporate,2025-10-08
+82,Aishwarya Shah,aishwarya.shah82@example.com,Panaji,Goa,3,Consumer,2024-04-11
+83,Manoj Agarwal,manoj.agarwal83@example.com,Ahmedabad,Gujarat,3,Small Business,2025-01-21
+84,Ishaan Chatterjee,ishaan.chatterjee84@example.com,Bengaluru,Karnataka,2,Consumer,2025-05-12
+85,Anjali Nair,anjali.nair85@example.com,Panaji,Goa,3,Consumer,2024-07-05
+86,Rohan Singh,rohan.singh86@example.com,Lucknow,Uttar Pradesh,1,Small Business,2024-03-02
+87,Vivaan Chatterjee,vivaan.chatterjee87@example.com,Ahmedabad,Gujarat,3,Consumer,2024-12-30
+88,Priya Dsouza,priya.dsouza88@example.com,Guwahati,Assam,4,Consumer,2024-03-07
+89,Suresh Shah,suresh.shah89@example.com,Bengaluru,Karnataka,2,Consumer,2025-12-09
+90,Farhan Fernandes,farhan.fernandes90@example.com,Bengaluru,Karnataka,2,Small Business,2026-02-14
+91,Rahul Mehta,rahul.mehta91@example.com,Indore,Madhya Pradesh,5,Small Business,2024-08-17
+92,Aishwarya Mishra,aishwarya.mishra92@example.com,Lucknow,Uttar Pradesh,1,Consumer,2026-05-14
+93,Vikram Mehta,vikram.mehta93@example.com,Ahmedabad,Gujarat,3,Consumer,2024-04-03
+94,Gurpreet Verma,gurpreet.verma94@example.com,Raipur,Chhattisgarh,5,Consumer,2024-06-11
+95,Imran Mehta,imran.mehta95@example.com,Kochi,Kerala,2,Small Business,2025-11-21
+96,Manoj Dsouza,manoj.dsouza96@example.com,Patna,Bihar,4,Corporate,2024-12-10
+97,Varun Bose,varun.bose97@example.com,Bhopal,Madhya Pradesh,5,Consumer,2024-05-26
+98,Aditya Iyer,aditya.iyer98@example.com,Bhopal,Madhya Pradesh,5,Small Business,2025-03-03
+99,  pooja singh ,pooja.singh99@example.com,,West Bengal,4,Consumer,2025-09-23
+100,Vivaan Kapoor,vivaan.kapoor100@example.com,Guwahati,Assam,4,Corporate,2024-01-11
+101,Harish Rao,harish.rao101@example.com,Guwahati,Assam,4,Small Business,2025-02-01
+102,Suresh Dsouza,suresh.dsouza102@example.com,Hyderabad,Telangana,2,Corporate,2025-12-24
+103,Anjali Sharma,anjali.sharma103@example.com,Delhi,Delhi,1,Small Business,2024-09-09
+104,Ananya Fernandes,ananya.fernandes104@example.com,Kolkata,West Bengal,4,Consumer,2024-04-10
+105,Suresh Malhotra,suresh.malhotra105@example.com,Nagpur,Maharashtra,5,Consumer,2026-01-25
+106,Diya Nair,diya.nair106@example.com,Panaji,Goa,3,Consumer,2025-11-10
+107,Harish Mishra,harish.mishra107@example.com,Hyderabad,Telangana,2,Consumer,2025-07-12
+108,Farhan Pillai,farhan.pillai108@example.com,Bengaluru,Karnataka,2,Small Business,2026-02-24
+109,Arjun Bose,,Ahmedabad,Gujarat,3,Corporate,2024-07-11
+110,Priya Khan,priya.khan110@example.com,Raipur,Chhattisgarh,5,Consumer,2025-10-08
+111,Rohan Menon,rohan.menon111@example.com,Panaji,Goa,3,Consumer,2025-02-28
+112,Diya Gupta,diya.gupta112@example.com,Nagpur,Maharashtra,5,Consumer,2024-03-07
+113,Neha Shah,neha.shah113@example.com,Raipur,Chhattisgarh,5,Consumer,2024-05-03
+114,Harish Fernandes,harish.fernandes114@example.com,Lucknow,Uttar Pradesh,1,Consumer,2024-03-16
+115,Neha Naidu,neha.naidu115@example.com,Chandigarh,Chandigarh,1,Consumer,2025-10-12
+116,Pooja Singh,pooja.singh116@example.com,Indore,Madhya Pradesh,5,Corporate,2025-03-26
+117,Tenzin Deshpande,tenzin.deshpande117@example.com,Guwahati,Assam,4,Small Business,2024-03-23
+118,Abhishek Singh,abhishek.singh118@example.com,Ahmedabad,Gujarat,3,Consumer,2024-06-09
+119,Nikhil Menon,nikhil.menon119@example.com,Delhi,Delhi,1,Corporate,2026-04-23
+120,Suresh Deshpande,suresh.deshpande120@example.com,,Bihar,4,Small Business,2024-08-26
+121,Deepak Chatterjee,deepak.chatterjee121@example.com,Pune,Maharashtra,3,Consumer,2024-08-06
+122,Rekha Deshpande,rekha.deshpande122@example.com,Delhi,Delhi,1,Consumer,2024-02-25
+123,Farhan Bose,farhan.bose123@example.com,Kolkata,West Bengal,4,Consumer,2026-01-07
+124,Pooja Naidu,pooja.naidu124@example.com,Patna,Bihar,4,Consumer,2025-12-23
+125,Nisha Joshi,nisha.joshi125@example.com,Pune,Maharashtra,3,Small Business,2024-07-26
+126,Aishwarya Iyer,aishwarya.iyer126@example.com,Bhopal,Madhya Pradesh,5,Consumer,2024-05-22
+127,Zoya Dsouza,zoya.dsouza127@example.com,Kolkata,West Bengal,4,Consumer,2024-04-03
+128,Manoj Dsouza,manoj.dsouza128@example.com,Guwahati,Assam,4,Corporate,2025-01-30
+129,Imran Deshpande,imran.deshpande129@example.com,Bengaluru,Karnataka,2,Consumer,2025-11-30
+130,Zoya Mishra,zoya.mishra130@example.com,Ahmedabad,Gujarat,3,Consumer,2024-12-04
+131,  nisha banerjee ,nisha.banerjee131@example.com,Patna,Bihar,4,Small Business,2026-02-08
+132,Simran Iyer,simran.iyer132@example.com,Jaipur,Rajasthan,1,Small Business,2025-02-04
+133,Sneha Chatterjee,sneha.chatterjee133@example.com,Chandigarh,Chandigarh,1,Small Business,2024-01-24
+134,Diya Chatterjee,diya.chatterjee134@example.com,Kochi,Kerala,2,Consumer,2026-01-01
+135,Simran Banerjee,simran.banerjee135@example.com,Lucknow,Uttar Pradesh,1,Consumer,2024-09-16
+136,Abhishek Fernandes,abhishek.fernandes136@example.com,Indore,Madhya Pradesh,5,Corporate,2026-04-05
+137,Arjun Verma,arjun.verma137@example.com,Kolkata,West Bengal,4,Small Business,2026-01-24
+138,Nikhil Singh,nikhil.singh138@example.com,Ahmedabad,Gujarat,3,Small Business,2025-11-03
+139,Zoya Das,zoya.das139@example.com,Hyderabad,Telangana,2,Corporate,2024-04-09
+140,Zoya Shah,zoya.shah140@example.com,Kolkata,West Bengal,4,Corporate,2026-04-18
+141,Sai Rao,sai.rao141@example.com,Nagpur,Maharashtra,5,Corporate,2024-11-05
+142,Rekha Patel,rekha.patel142@example.com,Delhi,Delhi,1,Corporate,2025-10-03
+143,Rahul Sharma,rahul.sharma143@example.com,Bhubaneswar,Odisha,4,Corporate,2024-03-28
+144,Nisha Dsouza,nisha.dsouza144@example.com,Delhi,Delhi,1,Consumer,2024-12-23
+145,Rahul Reddy,,Bhubaneswar,Odisha,4,Consumer,2024-10-10
+146,Aditya Deshpande,aditya.deshpande146@example.com,Kolkata,West Bengal,4,Consumer,2025-12-13
+147,Aishwarya Singh,aishwarya.singh147@example.com,Panaji,Goa,3,Consumer,2025-09-22
+148,Sana Fernandes,sana.fernandes148@example.com,Lucknow,Uttar Pradesh,1,Consumer,2024-09-24
+149,Imran Sharma,imran.sharma149@example.com,Pune,Maharashtra,3,Small Business,2025-04-21
+150,Pooja Malhotra,pooja.malhotra150@example.com,Bengaluru,Karnataka,2,Consumer,2025-10-12
+151,Rahul Rao,rahul.rao151@example.com,Delhi,Delhi,1,Small Business,2025-07-04
+152,Lakshmi Rao,lakshmi.rao152@example.com,Nagpur,Maharashtra,5,Consumer,2024-11-01
+153,Rohan Banerjee,rohan.banerjee153@example.com,Lucknow,Uttar Pradesh,1,Consumer,2026-03-07
+154,Abhishek Sharma,abhishek.sharma154@example.com,Raipur,Chhattisgarh,5,Small Business,2024-09-13
+155,Meera Joshi,meera.joshi155@example.com,Delhi,Delhi,1,Consumer,2024-01-06
+156,Nikhil Nair,nikhil.nair156@example.com,Nagpur,Maharashtra,5,Consumer,2025-06-27
+157,Pooja Singh,pooja.singh157@example.com,Lucknow,Uttar Pradesh,1,Consumer,2026-01-04
+158,Nikhil Shah,nikhil.shah158@example.com,Guwahati,Assam,4,Corporate,2025-07-12
+159,Simran Agarwal,simran.agarwal159@example.com,Kochi,Kerala,2,Consumer,2026-03-22
+160,Arjun Patel,arjun.patel160@example.com,Bhubaneswar,Odisha,4,Consumer,2025-08-06
+161,Priya Kapoor,priya.kapoor161@example.com,Kolkata,West Bengal,4,Consumer,2024-02-08
+162,Gurpreet Sharma,gurpreet.sharma162@example.com,Ahmedabad,Gujarat,3,Consumer,2025-11-19
+163,Ananya Patel,ananya.patel163@example.com,Ahmedabad,Gujarat,3,Corporate,2024-05-24
+164,Nisha Kapoor,nisha.kapoor164@example.com,Kochi,Kerala,2,Consumer,2025-03-14
+165,Rahul Shah,rahul.shah165@example.com,Ahmedabad,Gujarat,3,Consumer,2025-08-05
+166,Sruthi Fernandes,sruthi.fernandes166@example.com,Kolkata,West Bengal,4,Small Business,2026-02-20
+167,Vikram Gupta,vikram.gupta167@example.com,,Chandigarh,1,Corporate,2026-05-11
+168,Neha Menon,neha.menon168@example.com,Raipur,Chhattisgarh,5,Consumer,2025-03-13
+169,Vivaan Verma,vivaan.verma169@example.com,Chennai,Tamil Nadu,2,Consumer,2024-05-20
+170,Kavya Nair,kavya.nair170@example.com,Raipur,Chhattisgarh,5,Small Business,2025-06-28
+171,Aditya Gowda,aditya.gowda171@example.com,Lucknow,Uttar Pradesh,1,Corporate,2025-07-06
+172,Lakshmi Pillai,lakshmi.pillai172@example.com,Lucknow,Uttar Pradesh,1,Consumer,2025-01-24
+173,Rohan Reddy,rohan.reddy173@example.com,Bengaluru,Karnataka,2,Consumer,2024-02-07
+174,Abhishek Verma,abhishek.verma174@example.com,Pune,Maharashtra,3,Consumer,2025-01-14
+175,Sruthi Banerjee,sruthi.banerjee175@example.com,Kochi,Kerala,2,Consumer,2025-08-30
+176,Arjun Deshpande,arjun.deshpande176@example.com,Bhopal,Madhya Pradesh,5,Consumer,2024-04-06
+177,Farhan Iyer,farhan.iyer177@example.com,Ahmedabad,Gujarat,3,Corporate,2025-02-27
+178,Neha Das,neha.das178@example.com,Chandigarh,Chandigarh,1,Consumer,2024-06-16
+179,Ishaan Agarwal,ishaan.agarwal179@example.com,Hyderabad,Telangana,2,Consumer,2025-08-21
+180,Lakshmi Mehta,lakshmi.mehta180@example.com,Pune,Maharashtra,3,Consumer,2025-01-12
+181,Tenzin Reddy,tenzin.reddy181@example.com,Delhi,Delhi,1,Consumer,2024-08-13
+182,Rahul Banerjee,rahul.banerjee182@example.com,Nagpur,Maharashtra,5,Consumer,2025-12-30
+183,Rekha Mehta,rekha.mehta183@example.com,Guwahati,Assam,4,Consumer,2025-06-08
+184,Priya Shah,priya.shah184@example.com,Bhopal,Madhya Pradesh,5,Consumer,2025-03-23
+185,Sana Reddy,sana.reddy185@example.com,Kolkata,West Bengal,4,Consumer,2024-03-15
+186,Farhan Bose,farhan.bose186@example.com,Mumbai,Maharashtra,3,Consumer,2025-03-22
+187,Karthik Shah,karthik.shah187@example.com,Pune,Maharashtra,3,Corporate,2026-03-14
+188,Aditya Joshi,aditya.joshi188@example.com,Bhubaneswar,Odisha,4,Small Business,2026-01-30
+189,Aditya Patel,aditya.patel189@example.com,Kolkata,West Bengal,4,Consumer,2025-06-14
+190,Divya Iyer,divya.iyer190@example.com,Bhopal,Madhya Pradesh,5,Consumer,2025-03-02
+191,Neha Iyer,neha.iyer191@example.com,Mumbai,Maharashtra,3,Consumer,2025-09-21
+192,Farhan Joshi,farhan.joshi192@example.com,Mumbai,Maharashtra,3,Consumer,2024-08-12
+193,Abhishek Bose,abhishek.bose193@example.com,Jaipur,Rajasthan,1,Corporate,2026-05-11
+194,Vikram Kulkarni,vikram.kulkarni194@example.com,Kochi,Kerala,2,Consumer,2025-08-27
+195,Sana Singh,sana.singh195@example.com,Kochi,Kerala,2,Consumer,2025-02-10
+196,Vivaan Mishra,vivaan.mishra196@example.com,Chandigarh,Chandigarh,1,Consumer,2025-05-10
+197,Farhan Das,farhan.das197@example.com,,Uttar Pradesh,1,Corporate,2024-09-22
+198,Divya Iyer,divya.iyer198@example.com,Chennai,Tamil Nadu,2,Small Business,2026-06-17
+199,Divya Chatterjee,divya.chatterjee199@example.com,Mumbai,Maharashtra,3,Small Business,2024-12-27
+200,Rahul Reddy,rahul.reddy200@example.com,Pune,Maharashtra,3,Small Business,2024-12-08
+201,Pooja Iyer,pooja.iyer201@example.com,Delhi,Delhi,1,Corporate,2024-05-18
+202,Zoya Pillai,zoya.pillai202@example.com,Indore,Madhya Pradesh,5,Consumer,2025-04-01
+203,Nisha Das,nisha.das203@example.com,Bhubaneswar,Odisha,4,Consumer,2025-07-21
+204,Pooja Mehta,pooja.mehta204@example.com,Kochi,Kerala,2,Consumer,2026-04-03
+205,Rekha Sharma,rekha.sharma205@example.com,Kochi,Kerala,2,Consumer,2024-12-23
+206,Kavya Chatterjee,kavya.chatterjee206@example.com,Indore,Madhya Pradesh,5,Consumer,2025-01-05
+207,Neha Khan,neha.khan207@example.com,Patna,Bihar,4,Consumer,2026-02-02
+208,Imran Reddy,imran.reddy208@example.com,Panaji,Goa,3,Consumer,2024-07-26
+209,  vikram deshpande ,vikram.deshpande209@example.com,Kolkata,West Bengal,4,Consumer,2026-05-22
+210,Diya Mehta,diya.mehta210@example.com,Delhi,Delhi,1,Consumer,2024-01-31
+211,Sai Patel,sai.patel211@example.com,Lucknow,Uttar Pradesh,1,Consumer,2025-11-26
+212,Rohan Mishra,rohan.mishra212@example.com,Indore,Madhya Pradesh,5,Corporate,2025-01-25
+213,Nisha Agarwal,nisha.agarwal213@example.com,Pune,Maharashtra,3,Small Business,2025-07-17
+214,Karthik Patel,karthik.patel214@example.com,Bengaluru,Karnataka,2,Consumer,2024-03-26
+215,Ananya Chatterjee,ananya.chatterjee215@example.com,,Rajasthan,1,Consumer,2024-10-10
+216,Kavya Patel,kavya.patel216@example.com,Indore,Madhya Pradesh,5,Small Business,2025-03-11
+217,Deepak Deshpande,deepak.deshpande217@example.com,Patna,Bihar,4,Corporate,2026-05-19
+218,Suresh Patel,suresh.patel218@example.com,Ahmedabad,Gujarat,3,Consumer,2024-11-21
+219,Rekha Shah,rekha.shah219@example.com,Bhopal,Madhya Pradesh,5,Consumer,2025-06-29
+220,Manoj Menon,manoj.menon220@example.com,Panaji,Goa,3,Consumer,2025-07-08
+221,Rahul Fernandes,rahul.fernandes221@example.com,Ahmedabad,Gujarat,3,Corporate,2024-08-17
+222,Kavya Joshi,kavya.joshi222@example.com,Delhi,Delhi,1,Small Business,2025-01-22
+223,Gurpreet Khan,gurpreet.khan223@example.com,Chandigarh,Chandigarh,1,Consumer,2025-12-30
+224,Manoj Kulkarni,manoj.kulkarni224@example.com,Bhopal,Madhya Pradesh,5,Small Business,2024-05-21
+225,Zoya Chatterjee,zoya.chatterjee225@example.com,Mumbai,Maharashtra,3,Corporate,2025-04-04
+226,Sai Deshpande,sai.deshpande226@example.com,Kochi,Kerala,2,Consumer,2026-05-30
+227,Lakshmi Gowda,lakshmi.gowda227@example.com,Jaipur,Rajasthan,1,Consumer,2026-02-11
+228,Deepak Gupta,deepak.gupta228@example.com,Delhi,Delhi,1,Consumer,2024-04-16
+229,Neha Mehta,neha.mehta229@example.com,Jaipur,Rajasthan,1,Consumer,2024-09-23
+230,Aarav Khan,aarav.khan230@example.com,Bengaluru,Karnataka,2,Consumer,2024-09-14
+231,Vivaan Gupta,vivaan.gupta231@example.com,,Madhya Pradesh,5,Small Business,2024-08-20
+232,Sana Agarwal,sana.agarwal232@example.com,Lucknow,Uttar Pradesh,1,Consumer,2024-03-06
+233,Aarav Kulkarni,aarav.kulkarni233@example.com,Jaipur,Rajasthan,1,Small Business,2024-03-25
+234,Ritu Verma,ritu.verma234@example.com,Bhopal,Madhya Pradesh,5,Consumer,2025-03-20
+235,Priya Sinha,priya.sinha235@example.com,,Karnataka,2,Consumer,2024-06-10
+236,Rohan Kulkarni,rohan.kulkarni236@example.com,Patna,Bihar,4,Small Business,2025-11-27
+237,Meera Joshi,meera.joshi237@example.com,Raipur,Chhattisgarh,5,Consumer,2026-05-17
+238,Kavya Patel,kavya.patel238@example.com,Kochi,Kerala,2,Small Business,2025-06-19
+239,Rahul Kulkarni,rahul.kulkarni239@example.com,Jaipur,Rajasthan,1,Consumer,2025-10-23
+240,Simran Agarwal,simran.agarwal240@example.com,Kolkata,West Bengal,4,Consumer,2026-06-05
+241,Imran Dsouza,imran.dsouza241@example.com,Panaji,Goa,3,Consumer,2025-03-25
+242,Anjali Gowda,anjali.gowda242@example.com,Nagpur,Maharashtra,5,Consumer,2026-01-07
+243,Rohan Gowda,rohan.gowda243@example.com,Ahmedabad,Gujarat,3,Consumer,2025-03-14
+244,Divya Joshi,divya.joshi244@example.com,Indore,Madhya Pradesh,5,Consumer,2026-06-10
+245,Diya Malhotra,diya.malhotra245@example.com,Mumbai,Maharashtra,3,Corporate,2024-02-04
+246,Rekha Patel,rekha.patel246@example.com,Mumbai,Maharashtra,3,Consumer,2024-05-20
+247,Ananya Mishra,ananya.mishra247@example.com,Jaipur,Rajasthan,1,Consumer,2024-02-24
+248,Meera Bose,meera.bose248@example.com,Bhopal,Madhya Pradesh,5,Consumer,2026-04-16
+249,Vikram Menon,vikram.menon249@example.com,Pune,Maharashtra,3,Small Business,2025-09-11
+250,Vivaan Agarwal,vivaan.agarwal250@example.com,Indore,Madhya Pradesh,5,Consumer,2024-02-25
+251,Vivaan Kapoor,vivaan.kapoor251@example.com,Kolkata,West Bengal,4,Consumer,2024-08-01
+252,Meera Naidu,meera.naidu252@example.com,Pune,Maharashtra,3,Corporate,2025-12-24
+253,Sneha Bose,sneha.bose253@example.com,Kochi,Kerala,2,Corporate,2025-12-02
+254,Arjun Joshi,arjun.joshi254@example.com,Chennai,Tamil Nadu,2,Consumer,2025-03-02
+255,Suresh Mehta,suresh.mehta255@example.com,Raipur,Chhattisgarh,5,Corporate,2024-06-15
+256,Rekha Joshi,rekha.joshi256@example.com,Panaji,Goa,3,Consumer,2025-07-12
+257,Priya Dsouza,priya.dsouza257@example.com,Panaji,Goa,3,Small Business,2024-06-17
+258,Rahul Singh,,Indore,Madhya Pradesh,5,Consumer,2024-05-24
+259,Lakshmi Rao,lakshmi.rao259@example.com,Kochi,Kerala,2,Consumer,2025-02-11
+260,Karthik Banerjee,karthik.banerjee260@example.com,Panaji,Goa,3,Consumer,2025-07-19
+261,Zoya Reddy,zoya.reddy261@example.com,Delhi,Delhi,1,Small Business,2024-02-17
+262,Rahul Reddy,rahul.reddy262@example.com,Chennai,Tamil Nadu,2,Small Business,2026-02-06
+263,Kavya Deshpande,kavya.deshpande263@example.com,Chandigarh,Chandigarh,1,Consumer,2026-02-28
+264,Vikram Iyer,vikram.iyer264@example.com,Guwahati,Assam,4,Consumer,2025-08-18
+265,Meera Menon,meera.menon265@example.com,Raipur,Chhattisgarh,5,Corporate,2025-03-03
+266,Ishaan Mishra,ishaan.mishra266@example.com,Delhi,Delhi,1,Consumer,2024-12-21
+267,Rekha Joshi,rekha.joshi267@example.com,Delhi,Delhi,1,Consumer,2025-01-20
+268,Vikram Dsouza,vikram.dsouza268@example.com,Bengaluru,Karnataka,2,Consumer,2026-02-15
+269,Karthik Sharma,karthik.sharma269@example.com,Bengaluru,Karnataka,2,Consumer,2025-11-17
+270,Pooja Das,pooja.das270@example.com,Jaipur,Rajasthan,1,Consumer,2024-12-24
+271,Neha Bose,neha.bose271@example.com,Jaipur,Rajasthan,1,Small Business,2025-08-18
+272,Gurpreet Gupta,gurpreet.gupta272@example.com,Nagpur,Maharashtra,5,Consumer,2024-01-09
+273,Tenzin Chatterjee,tenzin.chatterjee273@example.com,Guwahati,Assam,4,Consumer,2024-05-14
+274,Sneha Kulkarni,sneha.kulkarni274@example.com,Pune,Maharashtra,3,Consumer,2025-02-03
+275,Vikram Naidu,vikram.naidu275@example.com,Patna,Bihar,4,Corporate,2024-07-26
+276,Harish Das,harish.das276@example.com,,Goa,3,Consumer,2025-11-27
+277,Imran Mishra,imran.mishra277@example.com,Indore,Madhya Pradesh,5,Small Business,2024-09-22
+278,Sneha Iyer,sneha.iyer278@example.com,Patna,Bihar,4,Corporate,2024-09-07
+279,Sana Malhotra,sana.malhotra279@example.com,Jaipur,Rajasthan,1,Small Business,2025-05-20
+280,Nikhil Banerjee,nikhil.banerjee280@example.com,Jaipur,Rajasthan,1,Consumer,2025-09-04
+281,Gurpreet Das,gurpreet.das281@example.com,Bhubaneswar,Odisha,4,Consumer,2024-01-05
+282,Priya Bose,priya.bose282@example.com,Nagpur,Maharashtra,5,Consumer,2025-09-30
+283,Imran Fernandes,imran.fernandes283@example.com,Chennai,Tamil Nadu,2,Consumer,2026-04-22
+284,Aditya Menon,aditya.menon284@example.com,Bengaluru,Karnataka,2,Consumer,2025-02-12
+285,Ishaan Shah,ishaan.shah285@example.com,Panaji,Goa,3,Consumer,2025-01-15
+286,Sai Deshpande,sai.deshpande286@example.com,Guwahati,Assam,4,Small Business,2024-04-19
+287,Rahul Naidu,rahul.naidu287@example.com,Kolkata,West Bengal,4,Consumer,2025-11-03
+288,Divya Rao,divya.rao288@example.com,Delhi,Delhi,1,Consumer,2024-06-09
+289,Sneha Sharma,sneha.sharma289@example.com,Nagpur,Maharashtra,5,Consumer,2025-05-03
+290,Gurpreet Mishra,gurpreet.mishra290@example.com,Pune,Maharashtra,3,Small Business,2025-06-04
+291,Harish Banerjee,harish.banerjee291@example.com,Lucknow,Uttar Pradesh,1,Consumer,2026-05-02
+292,Suresh Joshi,suresh.joshi292@example.com,Mumbai,Maharashtra,3,Corporate,2025-09-25
+293,  zoya dsouza ,zoya.dsouza293@example.com,Kochi,Kerala,2,Small Business,2024-03-14
+294,Ritu Iyer,ritu.iyer294@example.com,Delhi,Delhi,1,Consumer,2025-08-30
+295,Priya Rao,priya.rao295@example.com,Hyderabad,Telangana,2,Consumer,2024-06-21
+296,Arjun Shah,arjun.shah296@example.com,Lucknow,Uttar Pradesh,1,Corporate,2025-08-13
+297,Lakshmi Agarwal,lakshmi.agarwal297@example.com,Bhubaneswar,Odisha,4,Small Business,2024-12-27
+298,Farhan Sharma,farhan.sharma298@example.com,Chennai,Tamil Nadu,2,Consumer,2025-04-13
+299,Zoya Malhotra,zoya.malhotra299@example.com,Pune,Maharashtra,3,Consumer,2025-08-26
+300,Rahul Mishra,rahul.mishra300@example.com,Mumbai,Maharashtra,3,Consumer,2025-08-18

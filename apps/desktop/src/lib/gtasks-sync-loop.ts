@@ -1,4 +1,5 @@
 import { supabase } from "./supabase";
+import { reportGoogleSyncResult } from "./google-auth-status";
 
 const INTERVAL_MS = 2 * 60 * 1000; // more frequent than the main sync loop — this is the whole point of "edit on phone, see it here"
 
@@ -18,6 +19,7 @@ export function createGTasksSyncController(onSynced: () => void) {
     syncing = true;
     try {
       const { error } = await supabase.functions.invoke("gtasks-sync");
+      await reportGoogleSyncResult(error);
       if (error) {
         console.error("Google Tasks sync failed:", error);
       } else {

@@ -17,6 +17,10 @@ import { sanitizeTablePasteHtml } from "../lib/sanitize-table-paste";
 import { readPref, writePref, type ReadingFont } from "../lib/reading-prefs";
 import { FormatPainterButton } from "./FormatPainterButton";
 import { imageFileToDataUrl, isImageFile, isImageOnlyHtml, stripEmbeddedImages } from "../lib/image-embed";
+import { findSectionStarts } from "../lib/note-sections";
+import { jumpToSection } from "../lib/section-nav";
+import { SectionJumper } from "./SectionJumper";
+import { NoteFindBar } from "./NoteFindBar";
 
 /** Inserts each pasted image as an image block at the cursor — replacing
  * the current block if it's an empty paragraph, same as BlockNote's own
@@ -175,6 +179,13 @@ function PageEditorInner({
   const dirtyRef = useRef(false);
   const [saveState, setSaveState] = useState<"idle" | "saving" | "saved">("idle");
   const containerRef = useRef<HTMLDivElement>(null);
+  const [sectionIds, setSectionIds] = useState<string[]>(() => findSectionStarts(initialBlocks ?? []));
+  const sectionIdsRef = useRef<string[]>(sectionIds);
+  sectionIdsRef.current = sectionIds;
+  const [containerEl, setContainerEl] = useState<HTMLDivElement | null>(null);
+  const [findOpen, setFindOpen] = useState(false);
+  const [docVersion, setDocVersion] = useState(0);
+  const hoverRef = useRef(false);
   const [readingFont, setReadingFont] = useState<ReadingFont>(() => readPref("font", "sans" as ReadingFont));
   const [readingScale, setReadingScale] = useState<number>(() => {
     const s = parseFloat(readPref("scale", "1"));
@@ -189,23 +200,29 @@ function PageEditorInner({
     setTitleDraft(node["title"] as string);
   }, [node]);
 
-  // Ctrl+scroll / pinch zoom on the reading area (passive:false mandatory —
-  // WebView2 claims native page zoom on ctrl+wheel; we must preventDefault
-  // to intercept it. Windows trackpad pinch also delivers as ctrl+wheel.)
+  // Ctrl+scroll / touchpad pinch zoom on the reading area. Windows delivers
+  // a touchpad pinch as a burst of Ctrl+wheel events with small deltaY, and
+  // a mouse notch as one event with |deltaY|≈100 — so scale proportionally
+  // (exp) instead of a fixed ±0.1 per event, which made a pinch jump
+  // straight to 80%/200%. Listens on the whole scrolling pane (not just the
+  // editor column) so pinching over the margins or outline rail works too.
+  // passive:false is mandatory to be allowed to preventDefault.
   useEffect(() => {
     const el = containerRef.current;
     if (!el) return;
+    const target = (el.closest(".app-pane") as HTMLElement | null) ?? el;
     const onWheel = (e: WheelEvent) => {
       if (!e.ctrlKey) return;
       e.preventDefault();
+      const factor = Math.exp(-e.deltaY * 0.001);
       setReadingScale((s) => {
-        const next = Math.min(2, Math.max(0.8, parseFloat((s + (e.deltaY < 0 ? 0.1 : -0.1)).toFixed(2))));
+        const next = Math.min(2, Math.max(0.8, Math.round(s * factor * 1000) / 1000));
         writePref("scale", String(next));
         return next;
       });
     };
-    el.addEventListener("wheel", onWheel, { passive: false });
-    return () => el.removeEventListener("wheel", onWheel);
+    target.addEventListener("wheel", onWheel, { passive: false });
+    return () => target.removeEventListener("wheel", onWheel);
   }, []);
 
   // Keyboard zoom: Ctrl+= (in), Ctrl+- (out), Ctrl+0 (reset)
@@ -227,6 +244,46 @@ function PageEditorInner({
     return () => window.removeEventListener("keydown", onKey);
   }, []);
 
+  // Alt+↓ / Alt+↑ jump between sections. Capture phase + stopPropagation
+  // so ProseMirror (which listens on the contenteditable below) never sees
+  // the key — the note is always editable, so plain letters can't be used.
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (!e.altKey || e.ctrlKey || e.metaKey || e.shiftKey) return;
+      if (e.key !== "ArrowDown" && e.key !== "ArrowUp") return;
+      e.preventDefault();
+      e.stopPropagation();
+      jumpToSection(el, sectionIdsRef.current, e.key === "ArrowDown" ? 1 : -1);
+    };
+    el.addEventListener("keydown", onKey, { capture: true });
+    return () => el.removeEventListener("keydown", onKey, { capture: true });
+  }, []);
+
+  // Ctrl+F opens find for THIS note only when focus or the pointer is in
+  // it — split view has two editors, each with its own bar.
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
+    const enter = () => (hoverRef.current = true);
+    const leave = () => (hoverRef.current = false);
+    const onKey = (e: KeyboardEvent) => {
+      if (!e.ctrlKey || e.altKey || e.shiftKey || e.key.toLowerCase() !== "f") return;
+      if (!el.contains(document.activeElement) && !hoverRef.current) return;
+      e.preventDefault();
+      setFindOpen(true);
+    };
+    el.addEventListener("mouseenter", enter);
+    el.addEventListener("mouseleave", leave);
+    window.addEventListener("keydown", onKey);
+    return () => {
+      el.removeEventListener("mouseenter", enter);
+      el.removeEventListener("mouseleave", leave);
+      window.removeEventListener("keydown", onKey);
+    };
+  }, []);
+
   async function saveTitle() {
     const next = titleDraft.trim();
     const current = node["title"] as string;
@@ -246,6 +303,8 @@ function PageEditorInner({
 
   useEffect(() => {
     const unsubscribe = editor.onChange(() => {
+      setSectionIds(findSectionStarts(editor.document));
+      setDocVersion((v) => v + 1);
       dirtyRef.current = true;
       if (saveTimer.current) clearTimeout(saveTimer.current);
       saveTimer.current = setTimeout(() => void save(), SAVE_DEBOUNCE_MS);
@@ -293,7 +352,10 @@ function PageEditorInner({
   return (
     <div
       className="page-editor"
-      ref={containerRef}
+      ref={(el) => {
+        containerRef.current = el;
+        setContainerEl(el);
+      }}
       style={{
         "--reading-scale": readingScale,
         "--reading-font": readingFont === "serif" ? serifStack : "var(--font-sans)",
@@ -342,9 +404,13 @@ function PageEditorInner({
           </span>
         </div>
       </div>
+      {findOpen && containerEl && (
+        <NoteFindBar container={containerEl} docVersion={docVersion} onClose={() => setFindOpen(false)} />
+      )}
       <BlockNoteView editor={editor} theme={editorTheme} formattingToolbar={false}>
         <FormattingToolbarController formattingToolbar={CustomFormattingToolbar} />
       </BlockNoteView>
+      <SectionJumper container={containerEl} sectionIds={sectionIds} />
     </div>
   );
 }

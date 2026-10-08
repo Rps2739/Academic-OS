@@ -265,6 +265,35 @@ fn migrations() -> Vec<Migration> {
             CREATE INDEX idx_gd_prep_added ON gd_prep_local (added_at DESC);
             CREATE TABLE gd_seen_local (id TEXT PRIMARY KEY, seen_at TEXT NOT NULL);
         ",
+    }, Migration {
+        // Practice lab progress (docs/superpowers/specs/2026-09-28-practice-lab-design.md).
+        // Local-only (not in SYNC_TABLES) — covered by the daily backup.
+        version: 10,
+        description: "practice_progress_local",
+        kind: MigrationKind::Up,
+        sql: "
+            CREATE TABLE practice_progress_local (
+                item_id TEXT PRIMARY KEY,
+                status TEXT NOT NULL,
+                last_code TEXT,
+                updated_at TEXT NOT NULL
+            );
+        ",
+    }, Migration {
+        // Interviewer (docs/superpowers/specs/2026-09-28-interviewer-design.md).
+        // Local-only; covered by the daily backup. One row per attempt.
+        version: 11,
+        description: "interviewer_local",
+        kind: MigrationKind::Up,
+        sql: "
+            CREATE TABLE interview_attempts_local (
+                id TEXT PRIMARY KEY, question_id TEXT NOT NULL, section TEXT NOT NULL,
+                answer TEXT, checked_points TEXT, score INTEGER NOT NULL,
+                attempted_at TEXT NOT NULL, next_due_at TEXT NOT NULL
+            );
+            CREATE INDEX idx_interview_attempts_q ON interview_attempts_local (question_id, attempted_at DESC);
+            CREATE TABLE interview_cv_local (id TEXT PRIMARY KEY, text TEXT NOT NULL, updated_at TEXT NOT NULL);
+        ",
     }]
 }
 
@@ -357,6 +386,162 @@ fn dock_widgets(app: tauri::AppHandle) {
     dock_widgets_right(&app);
 }
 
+// ---------------------------------------------------------------------------
+// Local database safety net (docs/superpowers/specs/2026-09-28-reliability-design.md)
+// ---------------------------------------------------------------------------
+
+const DB_FILE: &str = "academic-os.db";
+const REPAIR_MARKER: &str = "repair-requested";
+const REPAIR_NOTICE: &str = "repair-notice.txt";
+
+/// Only digits and dashes — these strings become folder/file names.
+fn is_safe_stamp(s: &str) -> bool {
+    !s.is_empty() && s.len() <= 20 && s.chars().all(|c| c.is_ascii_digit() || c == '-')
+}
+
+/// Moves academic-os.db and its -wal/-shm siblings (whichever exist) into
+/// `<dir>/corrupted-backup-<stamp>/`. Never deletes anything. Returns the
+/// folder path.
+fn quarantine_db_files(dir: &std::path::Path, stamp: &str) -> std::io::Result<std::path::PathBuf> {
+    let target = dir.join(format!("corrupted-backup-{stamp}"));
+    std::fs::create_dir_all(&target)?;
+    for name in [DB_FILE.to_string(), format!("{DB_FILE}-wal"), format!("{DB_FILE}-shm")] {
+        let from = dir.join(&name);
+        if from.exists() {
+            std::fs::rename(&from, target.join(&name))?;
+        }
+    }
+    Ok(target)
+}
+
+/// Keeps at most `keep_before_new` existing daily backups (newest by name —
+/// names are academic-os-YYYY-MM-DD.db so they sort by date), and removes a
+/// same-day file so VACUUM INTO (which refuses to overwrite) can write it.
+fn prune_backups(backups: &std::path::Path, today_file: &str, keep_before_new: usize) -> std::io::Result<()> {
+    let mut names: Vec<String> = std::fs::read_dir(backups)?
+        .filter_map(|e| e.ok())
+        .map(|e| e.file_name().to_string_lossy().to_string())
+        .filter(|n| n.starts_with("academic-os-") && n.ends_with(".db"))
+        .collect();
+    if names.iter().any(|n| n == today_file) {
+        std::fs::remove_file(backups.join(today_file))?;
+        names.retain(|n| n != today_file);
+    }
+    names.sort();
+    let excess = names.len().saturating_sub(keep_before_new);
+    for old in names.iter().take(excess) {
+        std::fs::remove_file(backups.join(old))?;
+    }
+    Ok(())
+}
+
+#[tauri::command]
+fn prepare_backup(app: tauri::AppHandle, day: String, keep: u32) -> Result<String, String> {
+    if !is_safe_stamp(&day) || keep == 0 {
+        return Err("invalid backup arguments".into());
+    }
+    let dir = app.path().app_config_dir().map_err(|e| e.to_string())?.join("backups");
+    std::fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
+    let file = format!("academic-os-{day}.db");
+    prune_backups(&dir, &file, (keep as usize).saturating_sub(1)).map_err(|e| e.to_string())?;
+    Ok(dir.join(file).to_string_lossy().to_string())
+}
+
+/// Called by the main window when the local DB is corrupt. The files can't
+/// be moved now (the SQL plugin holds them open, and it only runs
+/// migrations on the first load per process), so leave a marker and
+/// restart; perform_pending_repair() does the move before anything reopens it.
+#[tauri::command]
+fn request_db_repair(app: tauri::AppHandle, stamp: String) -> Result<(), String> {
+    if !is_safe_stamp(&stamp) {
+        return Err("invalid stamp".into());
+    }
+    let dir = app.path().app_config_dir().map_err(|e| e.to_string())?;
+    std::fs::write(dir.join(REPAIR_MARKER), stamp).map_err(|e| e.to_string())?;
+    app.request_restart();
+    Ok(())
+}
+
+#[tauri::command]
+fn take_repair_notice(app: tauri::AppHandle) -> Option<String> {
+    let path = app.path().app_config_dir().ok()?.join(REPAIR_NOTICE);
+    let text = std::fs::read_to_string(&path).ok()?;
+    let _ = std::fs::remove_file(&path);
+    Some(text)
+}
+
+/// Runs at the very top of setup(), before any window can call the SQL
+/// plugin's load, so nothing holds the database open yet.
+fn perform_pending_repair(app: &tauri::AppHandle) {
+    let Ok(dir) = app.path().app_config_dir() else { return };
+    let marker = dir.join(REPAIR_MARKER);
+    let Ok(stamp) = std::fs::read_to_string(&marker) else { return };
+    let stamp = stamp.trim().to_string();
+    let _ = std::fs::remove_file(&marker);
+    if !is_safe_stamp(&stamp) {
+        return;
+    }
+    match quarantine_db_files(&dir, &stamp) {
+        Ok(folder) => {
+            let _ = std::fs::write(dir.join(REPAIR_NOTICE), folder.to_string_lossy().as_bytes());
+        }
+        Err(e) => eprintln!("database repair failed: {e}"),
+    }
+}
+
+#[cfg(test)]
+mod db_safety_tests {
+    use super::*;
+
+    fn temp_dir(name: &str) -> std::path::PathBuf {
+        let d = std::env::temp_dir().join(format!("academicos-test-{name}-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&d);
+        std::fs::create_dir_all(&d).unwrap();
+        d
+    }
+
+    #[test]
+    fn stamps_are_validated() {
+        assert!(is_safe_stamp("2026-09-28-1241"));
+        assert!(!is_safe_stamp("../evil"));
+        assert!(!is_safe_stamp(""));
+    }
+
+    #[test]
+    fn quarantine_moves_existing_files_only() {
+        let d = temp_dir("quarantine");
+        std::fs::write(d.join("academic-os.db"), b"db").unwrap();
+        std::fs::write(d.join("academic-os.db-wal"), b"wal").unwrap();
+        let folder = quarantine_db_files(&d, "2026-09-28-1241").unwrap();
+        assert!(!d.join("academic-os.db").exists());
+        assert_eq!(std::fs::read(folder.join("academic-os.db")).unwrap(), b"db");
+        assert_eq!(std::fs::read(folder.join("academic-os.db-wal")).unwrap(), b"wal");
+        assert!(!folder.join("academic-os.db-shm").exists());
+        let _ = std::fs::remove_dir_all(&d);
+    }
+
+    #[test]
+    fn prune_keeps_newest_and_clears_same_day() {
+        let d = temp_dir("prune");
+        for day in ["01", "02", "03", "04", "05", "06", "07", "08"] {
+            std::fs::write(d.join(format!("academic-os-2026-09-{day}.db")), b"x").unwrap();
+        }
+        std::fs::write(d.join("unrelated.txt"), b"keep me").unwrap();
+        prune_backups(&d, "academic-os-2026-09-08.db", 6).unwrap();
+        let mut left: Vec<String> = std::fs::read_dir(&d).unwrap().map(|e| e.unwrap().file_name().to_string_lossy().to_string()).collect();
+        left.sort();
+        assert_eq!(
+            left,
+            vec![
+                "academic-os-2026-09-02.db", "academic-os-2026-09-03.db", "academic-os-2026-09-04.db",
+                "academic-os-2026-09-05.db", "academic-os-2026-09-06.db", "academic-os-2026-09-07.db",
+                "unrelated.txt",
+            ]
+        );
+        let _ = std::fs::remove_dir_all(&d);
+    }
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -392,8 +577,19 @@ pub fn run() {
                 })
                 .build(),
         )
-        .invoke_handler(tauri::generate_handler![start_oauth_server, toggle_widgets, dock_widgets])
+        .invoke_handler(tauri::generate_handler![
+            start_oauth_server,
+            toggle_widgets,
+            dock_widgets,
+            prepare_backup,
+            request_db_repair,
+            take_repair_notice
+        ])
         .setup(|app| {
+            // Must run before anything else: finishes a repair the previous
+            // run requested, while no window has opened the database yet.
+            perform_pending_repair(app.handle());
+
             // The main window's [X] button used to fully destroy it (Tauri's
             // default) with nothing else registered to recreate it — once
             // destroyed, the tray's "Open" and the single-instance focus
